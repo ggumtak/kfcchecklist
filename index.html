@@ -1,0 +1,216 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#050608" />
+  <link rel="manifest" href="manifest.json" />
+  <title>REALITY_SYNC_V6 | KFC Checklist</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "google-genai": "https://esm.run/@google/genai"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="pt-14 pb-4 px-8 border-b border-white/5 flex justify-between items-end bg-black/50 backdrop-blur-lg">
+    <div>
+      <p id="system-date" class="text-[10px] mono text-cyan-300 font-bold tracking-widest uppercase mb-1">SYNCING...</p>
+      <h1 id="system-clock" class="text-4xl font-black mono tracking-tighter leading-none">00:00:00</h1>
+    </div>
+    <div class="text-right space-y-2">
+      <span id="sync-id" class="text-[9px] mono text-white/20 block">KERNEL_V6.0</span>
+      <div class="flex items-center gap-1.5 justify-end">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-[10px] mono text-emerald-500 font-bold tracking-widest">ACTIVE</span>
+      </div>
+      <button id="btn-settings"
+        class="text-[9px] mono text-white/40 hover:text-cyan-200 uppercase tracking-widest px-3 py-2 border border-white/10 rounded-[var(--radius)]">
+        SETTINGS
+      </button>
+    </div>
+  </header>
+
+  <div class="progress-bar-container"><div id="progress-fill"></div></div>
+
+  <div id="position-tabs" class="tab-bar"></div>
+
+  <main class="main-scroll px-6 py-8 space-y-12" id="main-content"></main>
+
+  <div id="footer-status" class="px-8 py-6 border-t border-white/5 bg-black/90 backdrop-blur-xl hidden">
+    <div class="flex justify-between items-center">
+      <div>
+        <span class="text-[10px] mono text-white/30 uppercase tracking-[0.2em] block mb-1">Global Completion</span>
+        <div class="flex items-end gap-2">
+          <span id="progress-percent" class="text-3xl font-black mono text-cyan-300 leading-none">00%</span>
+          <span id="task-count" class="text-[10px] mono text-white/20 mb-1">0/0 ITEMS</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-punch-out"
+          class="text-[9px] mono text-white/35 hover:text-cyan-200 uppercase tracking-widest px-3 py-2 border border-white/10 rounded-[var(--radius)]">
+          퇴 근
+        </button>
+
+        <button id="btn-factory-reset"
+          class="text-[9px] mono text-red-500/40 hover:text-red-500 uppercase tracking-widest px-3 py-2 border border-red-500/10 rounded-[var(--radius)]">
+          Factory Reset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lock-screen" class="fixed inset-0 z-50 bg-[#050608] flex flex-col items-center justify-center p-12">
+    <div class="w-full max-w-sm space-y-16">
+      <div class="space-y-3">
+        <div class="h-1.5 w-16 bg-cyan-400 mb-6"></div>
+        <h2 class="text-5xl font-black tracking-tighter leading-[0.85] italic uppercase">
+          Reality<br /><span class="text-cyan-300">Sync_v6.0</span>
+        </h2>
+        <p class="text-[10px] mono text-white/20 uppercase tracking-[0.4em]">S23_Ultra_Industrial_Edition</p>
+      </div>
+
+      <button id="btn-punch-in" class="btn-punch-in w-full py-10 text-2xl">출 근</button>
+    </div>
+  </div>
+
+  <div id="toast" class="px-5 py-4">
+    <div class="flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p id="toast-msg" class="text-[12px] font-bold text-white/90 truncate">삭제됨</p>
+        <p class="text-[10px] mono text-white/35 mt-0.5">UNDO로 복구 가능 (5s)</p>
+      </div>
+      <div class="flex items-center gap-2 flex-none">
+        <button id="toast-undo"
+          class="px-4 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-cyan-200 text-[10px] mono font-bold uppercase tracking-widest">
+          UNDO
+        </button>
+        <button id="toast-close"
+          class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/35 text-[10px] mono">
+          X
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-overlay" class="modal-overlay">
+    <div class="settings-panel">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Settings</p>
+          <h2 class="text-xl font-black">환경설정</h2>
+        </div>
+        <button id="settings-close" class="text-[12px] mono text-white/50">X</button>
+      </div>
+
+      <div class="settings-section space-y-3">
+        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">App</p>
+        <label class="text-[12px] text-white/70">기본 탭</label>
+        <select id="setting-default-tab" class="field w-full px-3 py-2 text-[12px]"></select>
+        <label class="flex items-center gap-2 text-[12px] text-white/70">
+          <input id="setting-show-carry" type="checkbox" /> 워크인 메모 표시
+        </label>
+        <p class="text-[11px] text-white/45">태스크는 길게 눌러 순서 변경 가능</p>
+      </div>
+
+      <div class="settings-section space-y-3">
+        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Data</p>
+        <div class="flex gap-2">
+          <button id="setting-export" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">EXPORT</button>
+          <button id="setting-import" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">IMPORT</button>
+        </div>
+        <input id="setting-import-file" type="file" accept="application/json" class="hidden" />
+        <button id="setting-reset" class="w-full px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-red-500/10 border border-red-400/20 text-[11px] mono text-red-300">FACTORY RESET</button>
+      </div>
+
+      <div class="settings-section space-y-3">
+        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">PWA</p>
+        <button id="setting-install" class="w-full px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">앱 설치 요청</button>
+        <p class="text-[11px] text-white/45">브라우저 메뉴에 “홈 화면에 추가”가 뜨는 경우도 있어요.</p>
+      </div>
+
+      <div class="settings-section space-y-3">
+        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Photo Share</p>
+        <p class="text-[11px] text-white/45">카톡 특정 채팅방 자동 전송은 보안상 불가. 공유 창에서 카카오톡 선택.</p>
+        <div class="flex gap-2">
+          <input id="media-camera" type="file" accept="image/*" capture="environment" class="hidden" />
+          <label for="media-camera" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono text-center">카메라</label>
+          <input id="media-gallery" type="file" accept="image/*" class="hidden" />
+          <label for="media-gallery" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono text-center">갤러리</label>
+        </div>
+        <div id="media-preview-wrap" class="media-preview hidden">
+          <img id="media-preview" alt="photo preview" />
+        </div>
+        <input id="media-note" class="field w-full px-3 py-2 text-[12px]" placeholder="공유 메시지(선택)" />
+        <div class="flex gap-2">
+          <button id="media-share" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200" disabled>공유</button>
+          <button id="media-clear" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">지우기</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <p class="text-[11px] text-white/40">체크리스트는 기기 로컬에 저장돼요. 브라우저 데이터 삭제 시 초기화됩니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <button id="chat-toggle" class="chat-toggle">CHAT</button>
+  <div id="chat-panel" class="chat-panel">
+    <div class="chat-header">
+      <div>
+        <p class="text-[9px] mono text-white/30 uppercase tracking-[0.2em]">Gemini 3 Flash</p>
+        <h3 class="text-sm font-black">챗봇</h3>
+      </div>
+      <button id="chat-close" class="text-[11px] mono text-white/50">X</button>
+    </div>
+    <div class="chat-body">
+      <div class="chat-tabs">
+        <button class="chat-tab-btn active" data-chat-tab="chat">CHAT</button>
+        <button class="chat-tab-btn" data-chat-tab="history">HISTORY</button>
+        <button class="chat-tab-btn" data-chat-tab="settings">SETTINGS</button>
+      </div>
+
+      <div class="chat-view active" data-chat-view="chat">
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input">
+          <textarea id="chat-input" class="field px-3 py-2 text-[12px]" placeholder="메시지 입력..."></textarea>
+          <button id="chat-send" class="px-4 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">SEND</button>
+        </div>
+      </div>
+
+      <div class="chat-view" data-chat-view="history">
+        <div class="chat-history">
+          <button id="chat-new" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">새 대화</button>
+          <div id="chat-session-list" class="mt-3 space-y-2"></div>
+        </div>
+      </div>
+
+      <div class="chat-view" data-chat-view="settings">
+        <div class="chat-settings space-y-3">
+          <div class="notice">API 키는 브라우저 로컬에 저장됩니다. GitHub에는 올리지 마세요.</div>
+          <label class="text-[11px] text-white/60">API KEY</label>
+          <input id="chat-api-key" type="password" class="field px-3 py-2 text-[12px]" placeholder="Google AI Studio 키" />
+          <label class="text-[11px] text-white/60">PROMPT</label>
+          <select id="chat-prompt" class="field w-full px-3 py-2 text-[12px]"></select>
+          <label class="text-[11px] text-white/60">THINKING LEVEL</label>
+          <select id="chat-thinking" class="field w-full px-3 py-2 text-[12px]">
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+          <label class="text-[11px] text-white/60">MODEL</label>
+          <input id="chat-model" class="field px-3 py-2 text-[12px]" placeholder="gemini-3-flash-preview" />
+          <button id="chat-clear" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">현재 대화 초기화</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
