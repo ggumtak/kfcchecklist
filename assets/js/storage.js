@@ -21,13 +21,20 @@ function normalizeTask(task){
   };
 }
 
-function normalizeCategories(categories){
+function normalizeCategories(categories, fallbackCategories = []){
   if(!Array.isArray(categories)) return [];
-  return categories.map((cat) => {
+  const fallbackMap = new Map(
+    Array.isArray(fallbackCategories)
+      ? fallbackCategories.map((cat) => [cat?.id, cat])
+      : []
+  );
+  return categories.map((cat, index) => {
     const safe = cat && typeof cat === "object" ? cat : {};
+    const fallback = fallbackMap.get(safe.id) || fallbackCategories[index];
     return {
       id: safe.id || createId("cat"),
       name: String(safe.name || "카테고리").trim() || "카테고리",
+      mode: safe.mode || fallback?.mode || "default",
       tasks: Array.isArray(safe.tasks) ? safe.tasks.map(normalizeTask) : []
     };
   });
@@ -36,12 +43,59 @@ function normalizeCategories(categories){
 function normalizePosition(pos, fallback){
   const safe = pos && typeof pos === "object" ? pos : {};
   const name = String(safe.name || fallback?.name || "포지션").trim() || "포지션";
-  const categories = normalizeCategories(safe.categories || fallback?.categories || []);
+  const categories = normalizeCategories(safe.categories || fallback?.categories || [], fallback?.categories || []);
   return {
     id: safe.id || fallback?.id || createId("pos"),
     name,
     categories
   };
+}
+
+function mergeDefaultTasks(targetCat, defaultCat){
+  if(!targetCat || !Array.isArray(defaultCat?.tasks)) return;
+  if(!Array.isArray(targetCat.tasks)) targetCat.tasks = [];
+  const existing = new Set(targetCat.tasks.map((task) => task.id));
+  defaultCat.tasks.forEach((task) => {
+    if(!existing.has(task.id)){
+      targetCat.tasks.push(normalizeTask(task));
+    }
+  });
+}
+
+function mergeDefaultCategories(positions, defaults){
+  Object.keys(defaults.positions).forEach((key) => {
+    const defPos = defaults.positions[key];
+    const pos = positions[key];
+    if(!pos || !Array.isArray(defPos.categories)) return;
+    const existingById = new Map(pos.categories.map((cat) => [cat.id, cat]));
+    const defaultIds = new Set();
+    const merged = [];
+
+    defPos.categories.forEach((defCat) => {
+      defaultIds.add(defCat.id);
+      const existing = existingById.get(defCat.id);
+      if(existing){
+        if(!existing.mode && defCat.mode) existing.mode = defCat.mode;
+        mergeDefaultTasks(existing, defCat);
+        merged.push(existing);
+      }else{
+        merged.push({
+          id: defCat.id || createId("cat"),
+          name: String(defCat.name || "카테고리").trim() || "카테고리",
+          mode: defCat.mode || "default",
+          tasks: Array.isArray(defCat.tasks) ? defCat.tasks.map(normalizeTask) : []
+        });
+      }
+    });
+
+    pos.categories.forEach((cat) => {
+      if(!defaultIds.has(cat.id)){
+        merged.push(cat);
+      }
+    });
+
+    pos.categories = merged;
+  });
 }
 
 function normalizeCarry(carry){
@@ -73,8 +127,13 @@ function normalizeState(raw){
     }
   });
 
+  mergeDefaultCategories(positions, defaults);
+
   const collapsed = safe.ui && typeof safe.ui === "object" && safe.ui.collapsed && typeof safe.ui.collapsed === "object"
     ? safe.ui.collapsed
+    : {};
+  const restockFilter = safe.ui && typeof safe.ui === "object" && safe.ui.restockFilter && typeof safe.ui.restockFilter === "object"
+    ? safe.ui.restockFilter
     : {};
 
   const prefs = safe.preferences && typeof safe.preferences === "object" ? safe.preferences : {};
@@ -87,7 +146,7 @@ function normalizeState(raw){
     activeTab,
     positions,
     carry: normalizeCarry(safe.carry || defaults.carry),
-    ui: { collapsed },
+    ui: { collapsed, restockFilter },
     preferences: {
       showCarry: prefs.showCarry !== false,
       defaultTab: prefs.defaultTab || defaults.preferences.defaultTab

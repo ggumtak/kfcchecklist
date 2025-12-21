@@ -43,6 +43,39 @@ function safeText(str) {
   return String(str || "").trim();
 }
 
+function isRestockCategory(cat) {
+  return cat?.mode === "restock";
+}
+
+function isRestockFilterOn(catId) {
+  return !!(state.ui?.restockFilter && state.ui.restockFilter[catId]);
+}
+
+function getTaskTextClass(task, mode) {
+  if (mode === "restock") {
+    return task.done ? "text-[#d4b28c]" : "text-white/60";
+  }
+  return task.done ? "text-white/20 line-through" : "text-white/90";
+}
+
+function getTaskCardClass(task, mode) {
+  if (mode === "restock") {
+    return task.done ? "restock-need" : "";
+  }
+  return task.done ? "bg-black/30 border-white/5" : "";
+}
+
+function getTaskCheckMarkup(task, mode) {
+  if (!task.done) return "";
+  if (mode === "restock") {
+    return `<span class="text-[12px] font-black text-[#121212]">!</span>`;
+  }
+  return `
+    <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path>
+    </svg>`;
+}
+
 function getLocalDateKey(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -70,7 +103,9 @@ function updateClock() {
 function computeProgress(positionId) {
   const position = state.positions[positionId];
   if (!position) return { total: 0, done: 0, pct: 0 };
-  const tasks = position.categories.flatMap((cat) => cat.tasks || []);
+  const tasks = position.categories
+    .filter((cat) => !isRestockCategory(cat))
+    .flatMap((cat) => cat.tasks || []);
   const total = tasks.length;
   const done = tasks.reduce((sum, task) => sum + (task.done ? 1 : 0), 0);
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -138,22 +173,19 @@ function renderTabs() {
   tabs.innerHTML = html;
 }
 
-function taskCardHTML(task, posId, catId) {
-  const doneClass = task.done ? "bg-black/30 border-white/5" : "";
-  const textClass = task.done ? "text-white/20 line-through" : "text-white/90";
-  const check = task.done
-    ? `
-    <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path>
-    </svg>`
-    : "";
+function taskCardHTML(task, posId, catId, mode = "default") {
+  const doneClass = getTaskCardClass(task, mode);
+  const textClass = getTaskTextClass(task, mode);
+  const check = getTaskCheckMarkup(task, mode);
+  const checkClass = `check-box ${task.done ? "checked" : ""} ${mode === "restock" ? "restock" : ""}`;
+  const modeClass = mode === "restock" ? "restock-card" : "";
 
   return `
-    <div class="square-card task-card p-5 flex items-center justify-between transition-all ${doneClass}"
+    <div class="square-card task-card p-5 flex items-center justify-between transition-all ${doneClass} ${modeClass}"
          data-task-id="${task.id}" data-cat-id="${catId}" data-pos-id="${posId}">
       <button class="flex items-center gap-4 flex-1 text-left"
               data-action="toggle-task" data-task-id="${task.id}">
-        <div class="check-box ${task.done ? "checked" : ""}">${check}</div>
+        <div class="${checkClass}">${check}</div>
         <span class="text-[15px] font-bold tracking-tight ${textClass}" data-task-text>${escapeHtml(
     task.text
   )}</span>
@@ -301,6 +333,29 @@ function toggleSection(catId) {
   safeVibrate(10);
 }
 
+function toggleRestockFilter(catId) {
+  if (!state.ui.restockFilter) state.ui.restockFilter = {};
+  state.ui.restockFilter[catId] = !isRestockFilterOn(catId);
+  scheduleSave();
+  renderActiveTab();
+  refreshProgressUI();
+  safeVibrate(10);
+}
+
+function resetRestockCategory(catId) {
+  const position = state.positions[state.activeTab];
+  const category = position?.categories.find((cat) => cat.id === catId);
+  if (!category) return;
+  category.tasks.forEach((task) => {
+    task.done = false;
+  });
+  scheduleSave();
+  renderActiveTab();
+  refreshProgressUI();
+  showToast("보충 목록 초기화");
+  safeVibrate([15, 30, 15]);
+}
+
 function clearDragTimer() {
   if (dragState.longPressTimer) {
     clearTimeout(dragState.longPressTimer);
@@ -404,6 +459,26 @@ function renderCategories(position) {
     section.dataset.catId = cat.id;
 
     const collapsed = isCollapsed(cat.id);
+    const isRestock = isRestockCategory(cat);
+    const restockFilterOn = isRestock && isRestockFilterOn(cat.id);
+    const visibleTasks = restockFilterOn ? cat.tasks.filter((task) => task.done) : cat.tasks;
+    const restockControls = isRestock
+      ? `
+          <button
+            class="restock-btn ${restockFilterOn ? "active" : ""}"
+            data-action="toggle-restock-filter" data-cat-id="${cat.id}" aria-label="restock filter">
+            NEED ONLY
+          </button>
+          <button
+            class="restock-btn reset"
+            data-action="reset-restock" data-cat-id="${cat.id}" aria-label="restock reset">
+            RESET
+          </button>
+        `
+      : "";
+    const restockHint = isRestock
+      ? `<p class="restock-hint">필요할 때 체크 → 채우면 해제. NEED ONLY는 부족 항목만 보기.</p>`
+      : "";
 
     section.innerHTML = `
       <div class="sticky-section-header flex items-center justify-between">
@@ -412,10 +487,12 @@ function renderCategories(position) {
           <h3 class="text-sm font-black text-white uppercase tracking-tight" data-cat-title>${escapeHtml(
     cat.name
   )}</h3>
+          ${isRestock ? `<span class="restock-tag">수시</span>` : ""}
         </div>
 
         <div class="flex items-center gap-2">
           <span class="text-[10px] mono text-white/20" id="cat-count-${cat.id}">0/0</span>
+          ${restockControls}
           <button
             class="p-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/60"
             data-action="edit-category" data-cat-id="${cat.id}" aria-label="edit category">EDIT</button>
@@ -430,8 +507,9 @@ function renderCategories(position) {
       </div>
 
       <div id="sec-body-${cat.id}" class="${collapsed ? "hidden" : ""} space-y-3">
+        ${restockHint}
         <div class="grid gap-3" id="list-${cat.id}">
-          ${cat.tasks.map((task) => taskCardHTML(task, position.id, cat.id)).join("")}
+          ${visibleTasks.map((task) => taskCardHTML(task, position.id, cat.id, cat.mode)).join("")}
         </div>
 
         <div id="add-box-${cat.id}" class="pt-2 px-1">
@@ -496,8 +574,9 @@ function updateSectionCounts(posId, catId) {
   if (!cat) return;
   const total = cat.tasks.length;
   const done = cat.tasks.reduce((sum, task) => sum + (task.done ? 1 : 0), 0);
+  const count = isRestockCategory(cat) ? `${done}/${total}` : `${done}/${total}`;
   const el = qs(`#cat-count-${catId}`);
-  if (el) el.textContent = `${done}/${total}`;
+  if (el) el.textContent = count;
 }
 
 function updateTaskDOM(taskId, catId) {
@@ -510,22 +589,38 @@ function updateTaskDOM(taskId, catId) {
 
   const checkbox = card.querySelector(".check-box");
   const text = card.querySelector("[data-task-text]");
+  const mode = category?.mode || "default";
+  const isRestock = mode === "restock";
 
+  checkbox.classList.toggle("restock", isRestock);
   if (task.done) {
-    card.classList.add("bg-black/30", "border-white/5");
-    checkbox.classList.add("checked");
-    checkbox.innerHTML = `
-      <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path>
-      </svg>`;
-    text.classList.add("text-white/20", "line-through");
-    text.classList.remove("text-white/90");
+    if (isRestock) {
+      card.classList.add("restock-need");
+      checkbox.classList.add("checked");
+      checkbox.innerHTML = `<span class="text-[12px] font-black text-[#121212]">!</span>`;
+      text.classList.add("text-[#d4b28c]");
+      text.classList.remove("text-white/60", "text-white/90", "line-through");
+    } else {
+      card.classList.add("bg-black/30", "border-white/5");
+      checkbox.classList.add("checked");
+      checkbox.innerHTML = `
+        <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path>
+        </svg>`;
+      text.classList.add("text-white/20", "line-through");
+      text.classList.remove("text-white/90");
+    }
   } else {
-    card.classList.remove("bg-black/30", "border-white/5");
+    card.classList.remove("restock-need", "bg-black/30", "border-white/5");
     checkbox.classList.remove("checked");
     checkbox.innerHTML = "";
-    text.classList.remove("text-white/20", "line-through");
-    text.classList.add("text-white/90");
+    if (isRestock) {
+      text.classList.remove("text-[#d4b28c]", "text-white/20", "line-through");
+      text.classList.add("text-white/60");
+    } else {
+      text.classList.remove("text-white/20", "line-through");
+      text.classList.add("text-white/90");
+    }
   }
 }
 
@@ -588,7 +683,7 @@ function confirmAddTask(catId) {
   const list = qs(`#list-${catId}`);
   if (list) {
     const wrap = document.createElement("div");
-    wrap.innerHTML = taskCardHTML(task, position.id, catId);
+    wrap.innerHTML = taskCardHTML(task, position.id, catId, category.mode);
     list.appendChild(wrap.firstElementChild);
   }
   updateSectionCounts(position.id, catId);
@@ -693,11 +788,13 @@ function updateTaskText(taskId, newText) {
   const position = state.positions[state.activeTab];
   if (!position) return;
   let task = null;
+  let mode = "default";
 
   position.categories.some((cat) => {
     const found = cat.tasks.find((item) => item.id === taskId);
     if (found) {
       task = found;
+      mode = cat.mode || "default";
       return true;
     }
     return false;
@@ -711,9 +808,7 @@ function updateTaskText(taskId, newText) {
   if (!card) return;
   const input = card.querySelector("input[data-edit-input='task']");
   const span = document.createElement("span");
-  span.className = `text-[15px] font-bold tracking-tight ${
-    task.done ? "text-white/20 line-through" : "text-white/90"
-  }`;
+  span.className = `text-[15px] font-bold tracking-tight ${getTaskTextClass(task, mode)}`;
   span.setAttribute("data-task-text", "");
   span.textContent = newText;
   if (input) {
@@ -820,7 +915,7 @@ function undoDelete() {
   const list = qs(`#list-${catId}`);
   if (list) {
     const wrap = document.createElement("div");
-    wrap.innerHTML = taskCardHTML(task, posId, catId);
+    wrap.innerHTML = taskCardHTML(task, posId, catId, category.mode);
     const el = wrap.firstElementChild;
     const ref = list.children[index];
     if (ref) {
@@ -1089,6 +1184,16 @@ function initEventHandlers() {
       return;
     }
 
+    if (action === "toggle-restock-filter") {
+      toggleRestockFilter(target.dataset.catId);
+      return;
+    }
+
+    if (action === "reset-restock") {
+      resetRestockCategory(target.dataset.catId);
+      return;
+    }
+
     if (action === "open-add-task") {
       openAddTaskInput(target.dataset.catId);
       safeVibrate(10);
@@ -1148,9 +1253,15 @@ function initEventHandlers() {
       if (!task) return;
       task.done = !task.done;
       scheduleSave();
-      updateTaskDOM(taskId, catId);
-      updateSectionCounts(position.id, catId);
-      refreshProgressUI();
+      const restock = isRestockCategory(category);
+      if (restock && isRestockFilterOn(catId)) {
+        renderActiveTab();
+        refreshProgressUI();
+      } else {
+        updateTaskDOM(taskId, catId);
+        updateSectionCounts(position.id, catId);
+        refreshProgressUI();
+      }
       safeVibrate(12);
       return;
     }

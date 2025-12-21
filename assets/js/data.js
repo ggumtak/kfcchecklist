@@ -18,7 +18,8 @@ const kitchenMidTasks = [
   { id: "km-1", text: "오븐 판 1개" },
   { id: "km-2", text: "양념 통들 넣고 빼는 판" },
   { id: "km-3", text: "집게 거치대2개+집게 1개" },
-  { id: "km-4", text: "7시 반 드레인+바스켓 4개 설거지" }
+  { id: "km-4", text: "7시 반 드레인+바스켓 4개 설거지" },
+  { id: "km-5", text: "사이드 주는 판 빼기" }
 ];
 
 const kitchenLateTasks = [
@@ -33,7 +34,23 @@ const kitchenLateTasks = [
   { id: "kl-9", text: "빵 봉투 묶기" },
   { id: "kl-10", text: "오븐 끄기" },
   { id: "kl-11", text: "집게 1개 닦기" },
-  { id: "kl-12", text: "오븐 쟁반 1개 닦기" }
+  { id: "kl-12", text: "오븐 쟁반 1개 닦기" },
+  { id: "kl-13", text: "종파" }
+];
+
+const backRestockTasks = [
+  { id: "br-1", text: "소스: 마요네즈 2개" },
+  { id: "br-2", text: "소스: 페퍼마요" },
+  { id: "br-3", text: "소스: 파이어소스" },
+  { id: "br-4", text: "소스: 딥치즈" },
+  { id: "br-5", text: "소스: 켄터키" },
+  { id: "br-6", text: "소스: 그레이비" },
+  { id: "br-7", text: "소스: 양념" },
+  { id: "br-8", text: "소스: 데리야끼" },
+  { id: "br-9", text: "베이컨" },
+  { id: "br-10", text: "치즈" },
+  { id: "br-11", text: "피클" },
+  { id: "br-12", text: "햄버거 래핑 용지" }
 ];
 
 export const DEFAULT_CARRY = [
@@ -62,6 +79,7 @@ export function createDefaultState(){
         id: "back",
         name: "백",
         categories: [
+          { id: "back-restock", name: "자재 보충 (수시)", mode: "restock", tasks: backRestockTasks.map(t => ({ ...t, done: false })) },
           { id: "back-default", name: "백 마감", tasks: [] }
         ]
       },
@@ -75,7 +93,8 @@ export function createDefaultState(){
     },
     carry: DEFAULT_CARRY.map(item => ({ ...item })),
     ui: {
-      collapsed: {}
+      collapsed: {},
+      restockFilter: {}
     },
     preferences: {
       showCarry: true,

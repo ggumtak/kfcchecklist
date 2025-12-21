@@ -95,16 +95,62 @@ h1,h2,h3,h4{
   transition:all 0.16s ease;
   flex:0 0 auto;
 }
+.check-box.restock{
+  border-color:rgba(185,153,122,0.6);
+}
 .check-box.checked{
   background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));
-  border-color:rgba(34,211,238,0.9);
-  box-shadow:0 0 14px rgba(34,211,238,0.18);
+  border-color:rgba(185,153,122,0.8);
+  box-shadow:0 0 14px rgba(185,153,122,0.18);
+}
+.check-box.restock.checked{
+  border-color:rgba(185,153,122,0.8);
+  box-shadow:0 0 14px rgba(185,153,122,0.2);
 }
 .task-card.dragging{
   opacity:0.72;
-  border-color:rgba(34,211,238,0.45);
-  box-shadow:0 0 22px rgba(34,211,238,0.18);
+  border-color:rgba(185,153,122,0.45);
+  box-shadow:0 0 22px rgba(185,153,122,0.18);
   transform:scale(0.985);
+}
+.restock-card{
+  background:rgba(255,255,255,0.02);
+}
+.restock-card.restock-need{
+  border-color:rgba(185,153,122,0.7);
+  box-shadow:0 0 0 1px rgba(185,153,122,0.18);
+}
+
+.restock-tag{
+  font-size:9px;
+  letter-spacing:0.25em;
+  padding:2px 6px;
+  border-radius:999px;
+  border:1px solid rgba(185,153,122,0.4);
+  color:var(--accent-cyan);
+}
+.restock-hint{
+  font-size:10px;
+  color:rgba(255,255,255,0.45);
+  padding:0 4px;
+}
+.restock-btn{
+  font-size:9px;
+  letter-spacing:0.2em;
+  padding:6px 8px;
+  border-radius:999px;
+  border:1px solid rgba(185,153,122,0.3);
+  color:var(--accent-cyan);
+  background:transparent;
+}
+.restock-btn.active{
+  background:rgba(185,153,122,0.18);
+  border-color:rgba(185,153,122,0.6);
+  color:#f3e5d6;
+}
+.restock-btn.reset{
+  border-color:rgba(239,83,80,0.35);
+  color:#ef5350;
 }
 
 .fade-in{ animation:fadeIn 0.35s ease-out forwards; }
@@ -496,6 +542,28 @@ button:disabled{
   border:1px solid rgba(34,211,238,0.2);
   font-size:11px;
   color:rgba(255,255,255,0.7);
+}
+
+.text-cyan-300,
+.text-cyan-200,
+.text-cyan-100{
+  color:var(--accent-cyan) !important;
+}
+.bg-cyan-300,
+.bg-cyan-400{
+  background-color:var(--accent-cyan) !important;
+}
+.bg-cyan-400\/10{
+  background-color:rgba(185,153,122,0.1) !important;
+}
+.bg-cyan-400\/15{
+  background-color:rgba(185,153,122,0.15) !important;
+}
+.border-cyan-300\/20{
+  border-color:rgba(185,153,122,0.2) !important;
+}
+.border-cyan-300\/25{
+  border-color:rgba(185,153,122,0.25) !important;
 }
 
 .canvas-overlay{
