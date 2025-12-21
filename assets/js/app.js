@@ -17,7 +17,7 @@ const dragState = {
   suppressClickUntil: 0
 };
 const DRAG_LONG_PRESS_MS = 280;
-const DRAG_MOVE_THRESHOLD = 8;
+const DRAG_MOVE_THRESHOLD = 16;
 
 const scheduleSave = debounce(() => saveState(state), 200);
 
@@ -393,12 +393,32 @@ function taskCardHTML(task, posId, catId, mode = "default", options = {}) {
   const modeClass = mode === "restock" ? "restock-card" : "";
   const showCarryToggle = !!options.showCarryToggle;
   const carryOpen = !!options.carryOpen;
+  const showPhotoActions = !!options.showPhotoActions;
   const carryBtn = showCarryToggle
     ? `
         <button class="icon-btn icon-sm text-white/35 hover:text-cyan-200 carry-toggle ${carryOpen ? "open" : ""}"
                 data-action="toggle-carry-panel" aria-label="해동표찰 수량">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      `
+    : "";
+  const photoButtons = showPhotoActions
+    ? `
+        <button class="icon-btn icon-sm text-white/35 hover:text-cyan-200"
+                data-action="open-camera" aria-label="카메라">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h4l2-2h4l2 2h4v12H4z" />
+            <circle cx="12" cy="13" r="3.5" />
+          </svg>
+        </button>
+        <button class="icon-btn icon-sm text-white/35 hover:text-cyan-200"
+                data-action="open-gallery" aria-label="갤러리">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 15l3-3 4 4 3-2 2 3" />
+            <circle cx="9" cy="9" r="1.5" />
           </svg>
         </button>
       `
@@ -416,6 +436,7 @@ function taskCardHTML(task, posId, catId, mode = "default", options = {}) {
       </button>
 
       <div class="flex items-center gap-2">
+        ${photoButtons}
         ${carryBtn}
         <button class="icon-btn icon-sm text-white/30 hover:text-cyan-200"
                 data-action="edit-task" data-task-id="${task.id}" aria-label="edit">
@@ -443,9 +464,11 @@ function renderTaskListHTML(position, category, tasks) {
 
   tasks.forEach((task) => {
     const isCarryAnchor = showCarry && isCarryAnchorTask(task);
+    const showPhotoActions = position?.id === "back" && task?.id === "ks-2";
     list.push(taskCardHTML(task, position.id, category.id, category.mode, {
       showCarryToggle: isCarryAnchor,
-      carryOpen
+      carryOpen,
+      showPhotoActions
     }));
     if (isCarryAnchor) {
       list.push(renderCarryInlineHTML());
@@ -879,7 +902,7 @@ function handlePointerDown(e) {
 
   const card = e.target.closest(".task-card");
   if (!card) return;
-  if (e.target.closest("[data-action=\"delete-task\"], [data-action=\"edit-task\"], [data-action=\"toggle-carry-panel\"]")) return;
+  if (e.target.closest("[data-action=\"delete-task\"], [data-action=\"edit-task\"], [data-action=\"toggle-carry-panel\"], [data-action=\"open-camera\"], [data-action=\"open-gallery\"]")) return;
   dragState.startX = e.clientX;
   dragState.startY = e.clientY;
   dragState.card = card;
@@ -1516,59 +1539,17 @@ function punchIn(targetTab) {
 }
 
 function initMediaShare() {
-  const cameraInput = qs("#media-camera");
-  const galleryInput = qs("#media-gallery");
-  const preview = qs("#media-preview");
-  const previewWrap = qs("#media-preview-wrap");
-  const shareBtn = qs("#media-share");
-  const clearBtn = qs("#media-clear");
-  const noteInput = qs("#media-note");
+  const cameraInput = qs("#inline-camera");
+  const galleryInput = qs("#inline-gallery");
+  if (!cameraInput && !galleryInput) return;
 
-  let currentFile = null;
-  let currentUrl = "";
+  const shareFiles = async (files) => {
+    const fileList = Array.from(files || []).filter(Boolean);
+    if (!fileList.length) return;
 
-  const reset = () => {
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    currentUrl = "";
-    currentFile = null;
-    if (preview) preview.src = "";
-    previewWrap?.classList.add("hidden");
-    if (shareBtn) shareBtn.disabled = true;
-  };
-
-  const handleFile = (file) => {
-    if (!file) return;
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    currentFile = file;
-    currentUrl = URL.createObjectURL(file);
-    if (preview) preview.src = currentUrl;
-    previewWrap?.classList.remove("hidden");
-    if (shareBtn) shareBtn.disabled = false;
-  };
-
-  cameraInput?.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    handleFile(file);
-    e.target.value = "";
-  });
-
-  galleryInput?.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    handleFile(file);
-    e.target.value = "";
-  });
-
-  clearBtn?.addEventListener("click", reset);
-
-  shareBtn?.addEventListener("click", async () => {
-    if (!currentFile) {
-      showToast("사진을 먼저 선택해줘");
-      return;
-    }
-    const text = noteInput?.value?.trim() || "";
-    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [currentFile] }))) {
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: fileList }))) {
       try {
-        await navigator.share({ text, files: [currentFile] });
+        await navigator.share({ files: fileList });
         showToast("공유 창 열림");
       } catch (err) {
         if (err?.name !== "AbortError") showToast("공유 실패");
@@ -1576,14 +1557,25 @@ function initMediaShare() {
       return;
     }
 
-    const url = URL.createObjectURL(currentFile);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = currentFile.name || "photo.jpg";
-    a.click();
-    URL.revokeObjectURL(url);
+    fileList.forEach((file) => {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.name || "photo.jpg";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
     showToast("공유 미지원: 파일로 저장했어");
-  });
+  };
+
+  const handleChange = (input) => {
+    if (!input?.files || input.files.length === 0) return;
+    shareFiles(input.files);
+    input.value = "";
+  };
+
+  cameraInput?.addEventListener("change", () => handleChange(cameraInput));
+  galleryInput?.addEventListener("change", () => handleChange(galleryInput));
 }
 
 function initSettings() {
@@ -1871,6 +1863,16 @@ function handleActionClick(target) {
 
   if (action === "toggle-carry-panel") {
     toggleCarryPanel();
+    return;
+  }
+
+  if (action === "open-camera") {
+    qs("#inline-camera")?.click();
+    return;
+  }
+
+  if (action === "open-gallery") {
+    qs("#inline-gallery")?.click();
     return;
   }
 

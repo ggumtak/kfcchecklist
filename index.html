@@ -221,30 +221,14 @@
         <p class="text-[11px] text-white/45">브라우저 메뉴에 “홈 화면에 추가”가 뜨는 경우도 있어요.</p>
       </div>
 
-      <div class="settings-section space-y-3">
-        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Photo Share</p>
-        <p class="text-[11px] text-white/45">카톡 특정 채팅방 자동 전송은 보안상 불가. 공유 창에서 카카오톡 선택.</p>
-        <div class="flex gap-2">
-          <input id="media-camera" type="file" accept="image/*" capture="environment" class="hidden" />
-          <label for="media-camera" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono text-center">카메라</label>
-          <input id="media-gallery" type="file" accept="image/*" class="hidden" />
-          <label for="media-gallery" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono text-center">갤러리</label>
-        </div>
-        <div id="media-preview-wrap" class="media-preview hidden">
-          <img id="media-preview" alt="photo preview" />
-        </div>
-        <input id="media-note" class="field w-full px-3 py-2 text-[12px]" placeholder="공유 메시지(선택)" />
-        <div class="flex gap-2">
-          <button id="media-share" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200" disabled>공유</button>
-          <button id="media-clear" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">지우기</button>
-        </div>
-      </div>
-
       <div class="settings-section">
         <p class="text-[11px] text-white/40">체크리스트는 기기 로컬에 저장돼요. 브라우저 데이터 삭제 시 초기화됩니다.</p>
       </div>
     </div>
   </div>
+
+  <input id="inline-camera" type="file" accept="image/*" capture="environment" class="hidden" />
+  <input id="inline-gallery" type="file" accept="image/*" multiple class="hidden" />
 
   <button id="chat-toggle" class="chat-toggle" aria-label="chat">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

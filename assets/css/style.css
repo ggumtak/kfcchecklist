@@ -120,6 +120,11 @@ h1,h2,h3,h4{
   transform:scale(0.985);
   touch-action:none;
 }
+.task-card{
+  -webkit-touch-callout:none;
+  user-select:none;
+  touch-action:pan-y;
+}
 .category-section.dragging{
   opacity:0.72;
   touch-action:none;
@@ -206,6 +211,9 @@ h1,h2,h3,h4{
   background: rgba(5, 6, 8, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  -webkit-touch-callout:none;
+  user-select:none;
+  touch-action:pan-y;
 }
 .sticky-section-header::after{
   content:"";
