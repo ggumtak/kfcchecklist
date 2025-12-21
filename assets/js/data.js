@@ -5,6 +5,8 @@ export const CHAT_STORAGE_KEY = "kfc_chat_state_v1";
 
 export const GUIDE_TAB = { id: "guide", name: "외국인 응대" };
 
+const DEFAULT_POSITION_ORDER = ["kitchen", "back", "counter"];
+
 const kitchenStartTasks = [
   { id: "ks-1", text: "해동표찰" },
   { id: "ks-2", text: "해동표찰 사진찍기" },
@@ -65,6 +67,7 @@ export function createDefaultState(){
     version: APP_VERSION,
     lastPunchDate: "",
     activeTab: "kitchen",
+    positionOrder: [...DEFAULT_POSITION_ORDER],
     positions: {
       kitchen: {
         id: "kitchen",

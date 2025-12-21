@@ -1,5 +1,5 @@
 ﻿import { loadState, saveState } from "./storage.js";
-import { GUIDE_TAB } from "./data.js";
+import { GUIDE_TAB, CHAT_STORAGE_KEY } from "./data.js";
 import { qs, escapeHtml, safeVibrate, createId, debounce, downloadFile, readFileAsText } from "./utils.js";
 import { getGuideHTML } from "./guide.js";
 
@@ -22,10 +22,30 @@ const scheduleSave = debounce(() => saveState(state), 200);
 
 const mainContent = () => qs("#main-content");
 
+function syncPositionOrder() {
+  if (!Array.isArray(state.positionOrder)) {
+    state.positionOrder = [];
+  }
+  const next = [];
+  const seen = new Set();
+  state.positionOrder.forEach((id) => {
+    if (state.positions[id] && !seen.has(id)) {
+      next.push(id);
+      seen.add(id);
+    }
+  });
+  Object.keys(state.positions).forEach((id) => {
+    if (!seen.has(id)) {
+      next.push(id);
+      seen.add(id);
+    }
+  });
+  state.positionOrder = next;
+}
+
 function getPositionOrder() {
-  const base = ["kitchen", "back", "counter"];
-  const extra = Object.keys(state.positions || {}).filter((key) => !base.includes(key));
-  return [...base.filter((key) => state.positions[key]), ...extra];
+  syncPositionOrder();
+  return state.positionOrder;
 }
 
 function getTabList() {
@@ -41,6 +61,184 @@ function ensureActiveTab() {
 
 function safeText(str) {
   return String(str || "").trim();
+}
+
+function loadChatSettings() {
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    const settings = parsed && typeof parsed === "object" ? parsed.settings : null;
+    if (!settings || typeof settings !== "object") return null;
+    return {
+      serverUrl: String(settings.serverUrl || ""),
+      promptId: String(settings.promptId || "searchmode"),
+      thinkingLevel: String(settings.thinkingLevel || "medium"),
+      model: String(settings.model || "gemini-3-flash-preview")
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function buildChatEndpoint(rawUrl) {
+  const trimmed = String(rawUrl || "").replace(/\/+$/, "");
+  if (!trimmed) return "";
+  if (trimmed.endsWith("/api/chat")) return trimmed;
+  if (trimmed.endsWith("/api")) return `${trimmed}/chat`;
+  return `${trimmed}/api/chat`;
+}
+
+function makeUniquePositionName(base) {
+  const name = safeText(base) || "새 체크리스트";
+  const existing = new Set(Object.values(state.positions).map((pos) => pos.name));
+  if (!existing.has(name)) return name;
+  let index = 2;
+  let next = `${name} ${index}`;
+  while (existing.has(next)) {
+    index += 1;
+    next = `${name} ${index}`;
+  }
+  return next;
+}
+
+function buildTasks(taskList) {
+  const unique = new Set();
+  return (Array.isArray(taskList) ? taskList : [])
+    .map((item) => safeText(typeof item === "string" ? item : item?.text || item?.name || ""))
+    .filter(Boolean)
+    .filter((text) => {
+      if (unique.has(text)) return false;
+      unique.add(text);
+      return true;
+    })
+    .map((text) => ({ id: createId("task"), text, done: false }));
+}
+
+function buildCategory(name, tasks = []) {
+  return {
+    id: createId("cat"),
+    name: safeText(name) || "카테고리",
+    tasks: buildTasks(tasks)
+  };
+}
+
+function cloneCategories(categories = [], resetDone = true) {
+  return (Array.isArray(categories) ? categories : []).map((cat) => ({
+    id: createId("cat"),
+    name: safeText(cat?.name) || "카테고리",
+    mode: cat?.mode,
+    tasks: (Array.isArray(cat?.tasks) ? cat.tasks : []).map((task) => ({
+      id: createId("task"),
+      text: safeText(task?.text) || "항목",
+      done: resetDone ? false : !!task?.done
+    }))
+  }));
+}
+
+function createPosition(name, categories = []) {
+  const safeName = makeUniquePositionName(name);
+  const safeCategories = categories.length ? categories : [buildCategory("할 일", [])];
+  return { id: createId("pos"), name: safeName, categories: safeCategories };
+}
+
+function extractJsonPayload(text) {
+  const raw = String(text || "");
+  const fenced = raw.match(/```json\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1].trim() : null;
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  const fallback = start >= 0 && end > start ? raw.slice(start, end + 1) : null;
+  const jsonText = candidate || fallback;
+  if (!jsonText) return null;
+  try {
+    return JSON.parse(jsonText);
+  } catch (_) {
+    return null;
+  }
+}
+
+function normalizeChecklistData(data) {
+  if (!data) return null;
+  let categories = null;
+  if (Array.isArray(data.categories)) categories = data.categories;
+  else if (Array.isArray(data.sections)) categories = data.sections;
+  else if (Array.isArray(data.lists)) categories = data.lists;
+  else if (Array.isArray(data.tasks)) {
+    categories = [{ name: data.title || data.name || "할 일", tasks: data.tasks }];
+  } else if (Array.isArray(data)) {
+    categories = data;
+  }
+
+  if (!categories) return null;
+
+  if (categories.every((item) => typeof item === "string")) {
+    return [{ name: data.title || "할 일", tasks: categories }];
+  }
+
+  return categories
+    .map((cat) => {
+      if (typeof cat === "string") {
+        return { name: cat, tasks: [] };
+      }
+      const name = safeText(cat?.name || cat?.title || cat?.category || cat?.section || "카테고리");
+      const rawTasks = Array.isArray(cat?.tasks)
+        ? cat.tasks
+        : Array.isArray(cat?.items)
+          ? cat.items
+          : Array.isArray(cat?.list)
+            ? cat.list
+            : Array.isArray(cat?.todos)
+              ? cat.todos
+              : [];
+      const tasks = rawTasks
+        .map((task) => safeText(typeof task === "string" ? task : task?.text || task?.name || ""))
+        .filter(Boolean);
+      return { name, tasks };
+    })
+    .filter((cat) => cat.name || (cat.tasks && cat.tasks.length));
+}
+
+function parseChecklistText(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const categories = [];
+  let current = null;
+
+  const pushCategory = (name) => {
+    const catName = safeText(name) || "할 일";
+    current = { name: catName, tasks: [] };
+    categories.push(current);
+  };
+
+  lines.forEach((line) => {
+    const raw = line.trim();
+    if (!raw || raw.startsWith("```")) return;
+    const heading = raw.match(/^#{1,6}\s+(.*)$/);
+    if (heading) {
+      pushCategory(heading[1]);
+      return;
+    }
+    const list = raw.match(/^[-*•]\s+(.*)$/) || raw.match(/^\d+\.\s+(.*)$/);
+    if (list) {
+      if (!current) pushCategory("할 일");
+      const taskText = safeText(list[1].replace(/^\[(x| )\]\s*/i, ""));
+      if (taskText) current.tasks.push(taskText);
+    }
+  });
+
+  return categories.length ? categories : null;
+}
+
+function buildCategoriesFromList(list, overrideName = "") {
+  const fallbackName = safeText(overrideName);
+  const listArray = Array.isArray(list) ? list : [];
+  return listArray
+    .map((cat, index) => {
+      const name = fallbackName && listArray.length === 1
+        ? fallbackName
+        : safeText(cat?.name || (index === 0 ? fallbackName : "") || "카테고리");
+      return buildCategory(name || "카테고리", cat?.tasks || []);
+    })
+    .filter((cat) => cat.name || (cat.tasks && cat.tasks.length));
 }
 
 function isRestockCategory(cat) {
@@ -354,6 +552,124 @@ function resetRestockCategory(catId) {
   refreshProgressUI();
   showToast("보충 목록 초기화");
   safeVibrate([15, 30, 15]);
+}
+
+function addPosition(position, makeActive = true) {
+  state.positions[position.id] = position;
+  if (!Array.isArray(state.positionOrder)) state.positionOrder = [];
+  state.positionOrder.push(position.id);
+  syncPositionOrder();
+  if (makeActive) state.activeTab = position.id;
+  scheduleSave();
+  renderTabs();
+  renderActiveTab();
+  refreshProgressUI();
+}
+
+function renamePosition(id, nextName) {
+  const position = state.positions[id];
+  if (!position) return;
+  const name = safeText(nextName);
+  if (!name) return;
+  position.name = name;
+  scheduleSave();
+  renderTabs();
+  refreshProgressUI();
+}
+
+function duplicatePosition(id) {
+  const position = state.positions[id];
+  if (!position) return null;
+  const clone = {
+    id: createId("pos"),
+    name: makeUniquePositionName(`${position.name} 복제`),
+    categories: cloneCategories(position.categories, true)
+  };
+  addPosition(clone, true);
+  return clone;
+}
+
+function deletePosition(id) {
+  const total = Object.keys(state.positions).length;
+  if (total <= 1) {
+    showToast("탭은 최소 1개 필요해요");
+    return;
+  }
+  const position = state.positions[id];
+  if (!position) return;
+  if (!confirm(`'${position.name}' 탭을 삭제할까요?`)) return;
+  delete state.positions[id];
+  if (Array.isArray(state.positionOrder)) {
+    state.positionOrder = state.positionOrder.filter((key) => key !== id);
+  }
+  syncPositionOrder();
+  if (state.activeTab === id) {
+    state.activeTab = state.positionOrder[0] || Object.keys(state.positions)[0];
+  }
+  if (state.preferences?.defaultTab === id) {
+    state.preferences.defaultTab = state.activeTab;
+  }
+  scheduleSave();
+  renderTabs();
+  renderActiveTab();
+  refreshProgressUI();
+}
+
+function parseChecklistResponse(text) {
+  const json = extractJsonPayload(text);
+  const categories = normalizeChecklistData(json) || parseChecklistText(text);
+  const title = safeText(json?.title || json?.name || "");
+  return { title, categories };
+}
+
+async function requestAiChecklist({ request, target, contextName }) {
+  const settings = loadChatSettings() || {};
+  const endpoint = buildChatEndpoint(settings.serverUrl || "");
+  if (!endpoint) {
+    showToast("챗봇 설정에서 SERVER URL을 먼저 입력해줘");
+    return null;
+  }
+
+  const promptId = settings.promptId || "searchmode";
+  const thinkingLevel = settings.thinkingLevel || "medium";
+  const model = settings.model || "gemini-3-flash-preview";
+  const position = state.positions[state.activeTab];
+  const existingCats = position?.categories?.map((cat) => cat.name).filter(Boolean).join(", ");
+  const contextLine = target === "current" && existingCats
+    ? `현재 탭 카테고리: ${existingCats}`
+    : "";
+
+  const instruction = [
+    "요청을 실무용 체크리스트로 변환해줘.",
+    "응답은 JSON만 출력.",
+    '형식: {"title":"체크리스트 이름","categories":[{"name":"카테고리","tasks":["항목1","항목2"]}]}',
+    "불필요한 설명, 코드블럭, 마크다운 금지.",
+    "문장은 짧고 구체적으로, 중복은 제거."
+  ].join("\n");
+  const userMessage = [instruction, contextLine, `요청: ${request}`].filter(Boolean).join("\n\n");
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      promptId,
+      thinkingLevel,
+      model,
+      messages: [{ role: "user", text: userMessage }]
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "요청 실패");
+  }
+
+  const parsed = parseChecklistResponse(data?.text || "");
+  if (!parsed.categories || !parsed.categories.length) {
+    throw new Error("체크리스트 파싱 실패");
+  }
+  const title = parsed.title || safeText(contextName);
+  return { title, categories: parsed.categories };
 }
 
 function clearDragTimer() {
@@ -1062,6 +1378,16 @@ function initSettings() {
   const importFile = qs("#setting-import-file");
   const resetBtn = qs("#setting-reset");
   const installBtn = qs("#setting-install");
+  const tabName = qs("#setting-tab-name");
+  const tabTemplate = qs("#setting-tab-template");
+  const tabAdd = qs("#setting-tab-add");
+  const tabList = qs("#setting-tab-list");
+  const aiTarget = qs("#setting-ai-target");
+  const aiNameLabel = qs("#setting-ai-name-label");
+  const aiName = qs("#setting-ai-name");
+  const aiRequest = qs("#setting-ai-request");
+  const aiBtn = qs("#setting-ai-generate");
+  const aiStatus = qs("#setting-ai-status");
 
   const updateDefaultOptions = () => {
     if (!defaultTab) return;
@@ -1071,11 +1397,60 @@ function initSettings() {
     defaultTab.value = state.preferences?.defaultTab || state.activeTab;
   };
 
+  const updateTabTemplateOptions = () => {
+    if (!tabTemplate) return;
+    const options = [
+      { id: "blank", label: "빈 탭" },
+      { id: "clone-active", label: "현재 탭 복제" }
+    ];
+    tabTemplate.innerHTML = options.map((opt) => `<option value="${opt.id}">${opt.label}</option>`).join("");
+  };
+
+  const renderTabManager = () => {
+    if (!tabList) return;
+    tabList.innerHTML = getPositionOrder()
+      .map((id) => {
+        const pos = state.positions[id];
+        if (!pos) return "";
+        const active = state.activeTab === id ? "active" : "";
+        return `
+          <div class="tab-manager-item ${active}" data-tab-id="${id}">
+            <div class="tab-manager-name">${escapeHtml(pos.name)}</div>
+            <div class="tab-manager-actions">
+              <button class="tab-manager-btn rename" data-tab-action="rename" data-tab-id="${id}">NAME</button>
+              <button class="tab-manager-btn dup" data-tab-action="dup" data-tab-id="${id}">DUP</button>
+              <button class="tab-manager-btn del" data-tab-action="del" data-tab-id="${id}">DEL</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  };
+
+  const updateAiLabels = () => {
+    if (!aiTarget || !aiNameLabel || !aiName) return;
+    const isNew = aiTarget.value === "new";
+    aiNameLabel.textContent = isNew ? "새 탭 이름" : "새 카테고리 이름";
+    aiName.placeholder = isNew ? "예: 여행 준비" : "예: 해야 할 일";
+  };
+
+  const setAiStatus = (msg, tone = "") => {
+    if (!aiStatus) return;
+    aiStatus.textContent = msg || "";
+    aiStatus.dataset.tone = tone;
+  };
+
   updateDefaultOptions();
+  updateTabTemplateOptions();
+  renderTabManager();
+  updateAiLabels();
+  setAiStatus("");
   if (showCarry) showCarry.checked = state.preferences?.showCarry !== false;
 
   openBtn?.addEventListener("click", () => {
     updateDefaultOptions();
+    renderTabManager();
+    updateAiLabels();
     if (overlay) overlay.classList.add("open");
   });
   closeBtn?.addEventListener("click", () => overlay?.classList.remove("open"));
@@ -1094,6 +1469,113 @@ function initSettings() {
     renderActiveTab();
   });
 
+  tabAdd?.addEventListener("click", () => {
+    const name = safeText(tabName?.value);
+    const template = tabTemplate?.value || "blank";
+    let categories = [];
+    if (template === "clone-active" && state.activeTab !== GUIDE_TAB.id) {
+      const active = state.positions[state.activeTab];
+      if (active) categories = cloneCategories(active.categories, true);
+    } else if (template === "clone-active") {
+      showToast("가이드 탭은 복제할 수 없어요");
+    }
+    const position = createPosition(name || "새 체크리스트", categories);
+    addPosition(position, true);
+    if (tabName) tabName.value = "";
+    updateDefaultOptions();
+    renderTabManager();
+  });
+
+  tabList?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-tab-action]");
+    if (!btn) {
+      const item = e.target.closest("[data-tab-id]");
+      const id = item?.dataset.tabId;
+      if (id && id !== state.activeTab) {
+        setActiveTab(id);
+        updateDefaultOptions();
+        renderTabManager();
+      }
+      return;
+    }
+    const id = btn.dataset.tabId;
+    const action = btn.dataset.tabAction;
+    if (!id || !action) return;
+
+    if (action === "rename") {
+      const next = window.prompt("새 탭 이름", state.positions[id]?.name || "");
+      if (next && next.trim()) {
+        renamePosition(id, next);
+        updateDefaultOptions();
+        renderTabManager();
+      }
+      return;
+    }
+
+    if (action === "dup") {
+      duplicatePosition(id);
+      updateDefaultOptions();
+      renderTabManager();
+      return;
+    }
+
+    if (action === "del") {
+      deletePosition(id);
+      updateDefaultOptions();
+      renderTabManager();
+    }
+  });
+
+  aiTarget?.addEventListener("change", updateAiLabels);
+
+  aiBtn?.addEventListener("click", async () => {
+    const request = safeText(aiRequest?.value);
+    if (!request) {
+      showToast("요청 내용을 입력해줘");
+      return;
+    }
+    const target = aiTarget?.value || "new";
+    const name = safeText(aiName?.value);
+    if (target === "current" && state.activeTab === GUIDE_TAB.id) {
+      showToast("가이드 탭에는 추가할 수 없어요");
+      return;
+    }
+
+    if (aiBtn) aiBtn.disabled = true;
+    setAiStatus("AI 생성 중...", "loading");
+    try {
+      const result = await requestAiChecklist({ request, target, contextName: name });
+      if (!result) throw new Error("AI 응답 없음");
+      const categories = buildCategoriesFromList(result.categories, target === "current" ? name : "");
+      if (!categories.length) throw new Error("카테고리 없음");
+
+      if (target === "new") {
+        const position = createPosition(result.title || name || "새 체크리스트", categories);
+        addPosition(position, true);
+      } else {
+        const position = state.positions[state.activeTab];
+        if (!position) throw new Error("현재 탭 없음");
+        position.categories.push(...categories);
+        scheduleSave();
+        renderActiveTab();
+        refreshProgressUI();
+      }
+
+      if (aiRequest) aiRequest.value = "";
+      if (aiName) aiName.value = "";
+      updateDefaultOptions();
+      renderTabManager();
+      setAiStatus("완료됨", "success");
+      showToast("AI 체크리스트 추가 완료");
+    } catch (err) {
+      console.warn(err);
+      setAiStatus("실패: 응답 형식 확인 필요", "error");
+      showToast("AI 생성 실패");
+    } finally {
+      if (aiBtn) aiBtn.disabled = false;
+    }
+  });
+
   exportBtn?.addEventListener("click", () => {
     downloadFile("kfc-checklist-backup.json", JSON.stringify(state, null, 2), "application/json");
   });
@@ -1110,6 +1592,8 @@ function initSettings() {
       renderTabs();
       renderActiveTab();
       refreshProgressUI();
+      updateDefaultOptions();
+      renderTabManager();
       showToast("불러오기 완료");
     } catch (e) {
       showToast("불러오기 실패");
@@ -1124,6 +1608,8 @@ function initSettings() {
     renderTabs();
     renderActiveTab();
     refreshProgressUI();
+    updateDefaultOptions();
+    renderTabManager();
   });
 
   installBtn?.addEventListener("click", async () => {

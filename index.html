@@ -113,6 +113,36 @@
       </div>
 
       <div class="settings-section space-y-3">
+        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Checklists</p>
+        <label class="text-[12px] text-white/70">새 탭 추가</label>
+        <input id="setting-tab-name" class="field w-full px-3 py-2 text-[12px]" placeholder="새 체크리스트 이름" />
+        <label class="text-[11px] text-white/60">템플릿</label>
+        <select id="setting-tab-template" class="field w-full px-3 py-2 text-[12px]"></select>
+        <button id="setting-tab-add" class="w-full px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">탭 추가</button>
+        <p class="text-[11px] text-white/45">탭 관리에서 이름 변경/복제/삭제 가능</p>
+        <div class="tab-manager">
+          <p class="text-[11px] text-white/40">탭 관리</p>
+          <div id="setting-tab-list" class="tab-manager-list"></div>
+        </div>
+      </div>
+
+      <div class="settings-section space-y-3">
+        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">AI Assist</p>
+        <p class="text-[11px] text-white/45">챗봇 설정의 SERVER URL/모델을 사용합니다.</p>
+        <label class="text-[11px] text-white/60">TARGET</label>
+        <select id="setting-ai-target" class="field w-full px-3 py-2 text-[12px]">
+          <option value="new">새 탭 생성</option>
+          <option value="current">현재 탭에 추가</option>
+        </select>
+        <label id="setting-ai-name-label" class="text-[11px] text-white/60">새 탭 이름</label>
+        <input id="setting-ai-name" class="field w-full px-3 py-2 text-[12px]" placeholder="예: 여행 준비" />
+        <label class="text-[11px] text-white/60">요청</label>
+        <textarea id="setting-ai-request" class="field w-full px-3 py-2 text-[12px]" rows="3" placeholder="예: 3박4일 일본 여행 준비 체크리스트 만들어줘"></textarea>
+        <button id="setting-ai-generate" class="w-full px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">AI로 초안 생성</button>
+        <p id="setting-ai-status" class="ai-status text-[11px]"></p>
+      </div>
+
+      <div class="settings-section space-y-3">
         <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Data</p>
         <div class="flex gap-2">
           <button id="setting-export" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">EXPORT</button>

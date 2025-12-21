@@ -129,6 +129,24 @@ function normalizeState(raw){
 
   mergeDefaultCategories(positions, defaults);
 
+  const baseOrder = Array.isArray(safe.positionOrder) && safe.positionOrder.length
+    ? safe.positionOrder
+    : Object.keys(defaults.positions);
+  const positionOrder = [];
+  const orderSet = new Set();
+  baseOrder.forEach((id) => {
+    if (positions[id] && !orderSet.has(id)) {
+      positionOrder.push(id);
+      orderSet.add(id);
+    }
+  });
+  Object.keys(positions).forEach((id) => {
+    if (!orderSet.has(id)) {
+      positionOrder.push(id);
+      orderSet.add(id);
+    }
+  });
+
   const collapsed = safe.ui && typeof safe.ui === "object" && safe.ui.collapsed && typeof safe.ui.collapsed === "object"
     ? safe.ui.collapsed
     : {};
@@ -144,6 +162,7 @@ function normalizeState(raw){
     version: safe.version || APP_VERSION,
     lastPunchDate: safe.lastPunchDate || "",
     activeTab,
+    positionOrder,
     positions,
     carry: normalizeCarry(safe.carry || defaults.carry),
     ui: { collapsed, restockFilter },
