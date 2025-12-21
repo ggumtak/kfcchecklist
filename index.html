@@ -230,6 +230,30 @@
   <input id="inline-camera" type="file" accept="image/*" capture="environment" class="hidden" />
   <input id="inline-gallery" type="file" accept="image/*" multiple class="hidden" />
 
+  <div id="camera-overlay" class="camera-overlay">
+    <div class="camera-panel">
+      <video id="camera-stream" class="camera-stream" autoplay playsinline></video>
+      <div class="camera-top">
+        <span id="camera-count" class="camera-count"></span>
+        <button id="camera-close" class="icon-btn icon-sm text-white/60" aria-label="close camera">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6l-12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="camera-controls">
+        <button id="camera-share" class="icon-btn text-white/60" aria-label="share photos" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16 6l-4-4-4 4" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 2v14" />
+          </svg>
+        </button>
+        <button id="camera-shot" class="camera-shot" aria-label="take photo"></button>
+      </div>
+    </div>
+  </div>
+
   <button id="chat-toggle" class="chat-toggle" aria-label="chat">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M21 12c0 4.4-4.3 8-9.5 8a11 11 0 01-4.1-.8L3 20l.9-3.4A7.2 7.2 0 013 12c0-4.4 4.3-8 9.5-8S21 7.6 21 12z" />

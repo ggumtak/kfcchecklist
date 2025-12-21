@@ -5,6 +5,7 @@ import { getGuideHTML } from "./guide.js";
 
 let state = loadState();
 let toastTimer = null;
+let openCameraOverlay = null;
 const dragState = {
   active: false,
   type: "task",
@@ -14,7 +15,11 @@ const dragState = {
   startX: 0,
   startY: 0,
   longPressTimer: null,
-  suppressClickUntil: 0
+  suppressClickUntil: 0,
+  prevBodyOverflow: "",
+  prevBodyOverscroll: "",
+  prevContentTouch: "",
+  prevBodyTouch: ""
 };
 const DRAG_LONG_PRESS_MS = 280;
 const DRAG_MOVE_THRESHOLD = 16;
@@ -828,6 +833,17 @@ function startDrag(card, catId, pointerId, type = "task") {
   dragState.pointerId = pointerId;
   card.classList.add("dragging");
   document.body.classList.add("dragging-body");
+  dragState.prevBodyOverflow = document.body.style.overflow;
+  dragState.prevBodyOverscroll = document.body.style.overscrollBehaviorY;
+  dragState.prevBodyTouch = document.body.style.touchAction;
+  document.body.style.overflow = "hidden";
+  document.body.style.overscrollBehaviorY = "contain";
+  document.body.style.touchAction = "none";
+  const container = mainContent();
+  if (container) {
+    dragState.prevContentTouch = container.style.touchAction;
+    container.style.touchAction = "none";
+  }
   if (card.setPointerCapture) {
     try {
       card.setPointerCapture(pointerId);
@@ -863,6 +879,11 @@ function endDrag(commit = true) {
     } catch (_) {}
   }
   document.body.classList.remove("dragging-body");
+  document.body.style.overflow = dragState.prevBodyOverflow;
+  document.body.style.overscrollBehaviorY = dragState.prevBodyOverscroll;
+  document.body.style.touchAction = dragState.prevBodyTouch;
+  const container = mainContent();
+  if (container) container.style.touchAction = dragState.prevContentTouch;
   if (commit) {
     if (dragState.type === "category") {
       reorderCategoriesFromDOM();
@@ -876,6 +897,10 @@ function endDrag(commit = true) {
   dragState.card = null;
   dragState.catId = null;
   dragState.pointerId = null;
+  dragState.prevBodyOverflow = "";
+  dragState.prevBodyOverscroll = "";
+  dragState.prevContentTouch = "";
+  dragState.prevBodyTouch = "";
   dragState.suppressClickUntil = Date.now() + 300;
 }
 
@@ -1493,20 +1518,47 @@ function resetAllTasks() {
   });
 }
 
+function showLockScreen() {
+  const lock = qs("#lock-screen");
+  if (!lock) return;
+  lock.style.display = "flex";
+  lock.style.opacity = "1";
+  lock.style.pointerEvents = "auto";
+  qs("#footer-status")?.classList.add("hidden");
+}
+
+function hideLockScreen() {
+  const lock = qs("#lock-screen");
+  if (!lock) return;
+  lock.style.opacity = "0";
+  lock.style.pointerEvents = "none";
+  setTimeout(() => {
+    lock.style.display = "none";
+  }, 300);
+  qs("#footer-status")?.classList.remove("hidden");
+}
+
+function applyLockState() {
+  const todayKey = getLocalDateKey(new Date());
+  if (state.lastPunchDate !== todayKey) {
+    state.sessionActive = false;
+    scheduleSave();
+  }
+  if (state.sessionActive) {
+    hideLockScreen();
+  } else {
+    showLockScreen();
+  }
+}
+
 function punchOutAndReset() {
   if (!confirm("퇴근 처리하고 체크를 초기화할까요?")) return;
   resetAllTasks();
+  state.sessionActive = false;
   state.lastPunchDate = getLocalDateKey(new Date());
   scheduleSave();
   renderActiveTab();
-
-  const lock = qs("#lock-screen");
-  if (lock) {
-    lock.style.display = "flex";
-    lock.style.opacity = "1";
-    lock.style.pointerEvents = "auto";
-  }
-  qs("#footer-status")?.classList.add("hidden");
+  showLockScreen();
   safeVibrate([25, 40, 25]);
 }
 
@@ -1523,15 +1575,9 @@ function punchIn(targetTab) {
     scheduleSave();
   }
 
-  const lock = qs("#lock-screen");
-  if (lock) {
-    lock.style.opacity = "0";
-    lock.style.pointerEvents = "none";
-    setTimeout(() => {
-      lock.style.display = "none";
-    }, 500);
-  }
-  qs("#footer-status")?.classList.remove("hidden");
+  state.sessionActive = true;
+  scheduleSave();
+  hideLockScreen();
   renderTabs();
   renderActiveTab();
   refreshProgressUI();
@@ -1541,7 +1587,65 @@ function punchIn(targetTab) {
 function initMediaShare() {
   const cameraInput = qs("#inline-camera");
   const galleryInput = qs("#inline-gallery");
-  if (!cameraInput && !galleryInput) return;
+  const overlay = qs("#camera-overlay");
+  const video = qs("#camera-stream");
+  const closeBtn = qs("#camera-close");
+  const shotBtn = qs("#camera-shot");
+  const shareBtn = qs("#camera-share");
+  const countEl = qs("#camera-count");
+  if (!cameraInput && !galleryInput && !overlay) return;
+
+  let stream = null;
+  let shots = [];
+  let historyPushed = false;
+
+  const updateCameraStatus = () => {
+    if (countEl) countEl.textContent = shots.length ? `${shots.length}` : "";
+    if (shareBtn) shareBtn.disabled = shots.length === 0;
+  };
+
+  const stopStream = () => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      stream = null;
+    }
+    if (video) video.srcObject = null;
+  };
+
+  const closeOverlay = () => {
+    if (!overlay) return;
+    overlay.classList.remove("open");
+    stopStream();
+    shots = [];
+    updateCameraStatus();
+    if (historyPushed) {
+      historyPushed = false;
+      if (history.state?.cameraOverlay) history.back();
+    }
+  };
+
+  const openOverlay = async () => {
+    if (!overlay || !video || !navigator.mediaDevices?.getUserMedia) {
+      cameraInput?.click();
+      return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      video.srcObject = stream;
+      overlay.classList.add("open");
+      shots = [];
+      updateCameraStatus();
+      if (!historyPushed) {
+        history.pushState({ cameraOverlay: true }, "");
+        historyPushed = true;
+      }
+    } catch (err) {
+      console.warn("[camera] getUserMedia failed", err);
+      cameraInput?.click();
+    }
+  };
+
+  openCameraOverlay = openOverlay;
 
   const shareFiles = async (files) => {
     const fileList = Array.from(files || []).filter(Boolean);
@@ -1576,6 +1680,42 @@ function initMediaShare() {
 
   cameraInput?.addEventListener("change", () => handleChange(cameraInput));
   galleryInput?.addEventListener("change", () => handleChange(galleryInput));
+
+  shotBtn?.addEventListener("click", async () => {
+    if (!video || !stream) return;
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, width, height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    if (!blob) return;
+    const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
+    shots.push(file);
+    updateCameraStatus();
+    showToast(`촬영됨 (${shots.length})`);
+  });
+
+  shareBtn?.addEventListener("click", async () => {
+    if (!shots.length) return;
+    await shareFiles(shots);
+    shots = [];
+    updateCameraStatus();
+  });
+
+  closeBtn?.addEventListener("click", closeOverlay);
+  overlay?.addEventListener("click", (e) => {
+    if (e.target === overlay) closeOverlay();
+  });
+
+  window.addEventListener("popstate", () => {
+    if (overlay?.classList.contains("open")) {
+      closeOverlay();
+    }
+  });
 }
 
 function initSettings() {
@@ -1823,6 +1963,7 @@ function initSettings() {
     applyFocusMode();
     updateDefaultOptions();
     renderTabManager();
+    applyLockState();
   });
 
   installBtn?.addEventListener("click", async () => {
@@ -1867,7 +2008,11 @@ function handleActionClick(target) {
   }
 
   if (action === "open-camera") {
-    qs("#inline-camera")?.click();
+    if (typeof openCameraOverlay === "function") {
+      openCameraOverlay();
+    } else {
+      qs("#inline-camera")?.click();
+    }
     return;
   }
 
@@ -2002,6 +2147,7 @@ function initEventHandlers() {
     renderActiveTab();
     refreshProgressUI();
     applyFocusMode();
+    applyLockState();
   });
 
   qs("#btn-focus")?.addEventListener("click", toggleFocusMode);
@@ -2019,6 +2165,11 @@ function initEventHandlers() {
   content?.addEventListener("pointerup", handlePointerUp);
   content?.addEventListener("pointercancel", handlePointerUp);
   window.addEventListener("pointerup", handlePointerUp);
+  const preventDragScroll = (e) => {
+    if (!dragState.active) return;
+    e.preventDefault();
+  };
+  content?.addEventListener("touchmove", preventDragScroll, { passive: false });
 
   content?.addEventListener("click", (e) => {
     const target = e.target.closest("[data-action]");
@@ -2031,6 +2182,7 @@ function initEventHandlers() {
   restockPanel?.addEventListener("pointermove", handlePointerMove, { passive: false });
   restockPanel?.addEventListener("pointerup", handlePointerUp);
   restockPanel?.addEventListener("pointercancel", handlePointerUp);
+  restockPanel?.addEventListener("touchmove", preventDragScroll, { passive: false });
   restockPanel?.addEventListener("click", (e) => {
     const target = e.target.closest("[data-action]");
     if (!target) return;
@@ -2082,6 +2234,7 @@ export function initApp() {
   renderActiveTab();
   refreshProgressUI();
   applyFocusMode();
+  applyLockState();
   initSettings();
   initEventHandlers();
   updateClock();

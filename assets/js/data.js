@@ -66,6 +66,7 @@ export function createDefaultState(){
   return {
     version: APP_VERSION,
     lastPunchDate: "",
+    sessionActive: false,
     activeTab: "back",
     positionOrder: [...DEFAULT_POSITION_ORDER],
     positions: {

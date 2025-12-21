@@ -2,6 +2,7 @@
 import { qs, escapeHtml, createId, debounce } from "./utils.js";
 
 const PROMPTS = [
+  { id: "none", name: "프롬프트 없음" },
   { id: "searchmode", name: "SearchMode_251124" },
   { id: "ailey-debate", name: "Ailey Debate (v1213)" },
   { id: "ailey-bailey-x", name: "Ailey & Bailey X_251023" }

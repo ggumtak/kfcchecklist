@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const PROMPT_FILES = {
+  none: "",
   searchmode: "prompts/searchmode_251124.txt",
   "ailey-debate": "prompts/ailey-debate-v1213.txt",
   "ailey-bailey-x": "prompts/ailey-bailey-x-251023.txt"
@@ -40,6 +41,7 @@ function resolvePath(relativePath) {
 }
 
 async function getPromptText(promptId) {
+  if (promptId === "none") return "";
   const file = PROMPT_FILES[promptId];
   if (!file) return "";
   if (promptCache.has(file)) return promptCache.get(file);
@@ -107,7 +109,9 @@ export default async function handler(req, res) {
   }
 
   const requestedPromptId = typeof body?.promptId === "string" ? body.promptId : DEFAULT_PROMPT_ID;
-  const promptId = PROMPT_FILES[requestedPromptId] ? requestedPromptId : DEFAULT_PROMPT_ID;
+  const promptId = Object.prototype.hasOwnProperty.call(PROMPT_FILES, requestedPromptId)
+    ? requestedPromptId
+    : DEFAULT_PROMPT_ID;
   const thinkingLevel = ALLOWED_THINKING.has(body?.thinkingLevel) ? body.thinkingLevel : "medium";
   const model = typeof body?.model === "string" && body.model.trim()
     ? body.model.trim()

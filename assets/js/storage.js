@@ -228,10 +228,12 @@ function normalizeState(raw){
   const prefs = safe.preferences && typeof safe.preferences === "object" ? safe.preferences : {};
 
   const activeTab = typeof safe.activeTab === "string" ? safe.activeTab : (prefs.defaultTab || defaults.activeTab);
+  const sessionActive = safe.sessionActive === true;
 
   return {
     version: safe.version || APP_VERSION,
     lastPunchDate: safe.lastPunchDate || "",
+    sessionActive,
     activeTab,
     positionOrder,
     positions,
