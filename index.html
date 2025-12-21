@@ -257,7 +257,15 @@
         <p class="text-[9px] mono text-white/30 uppercase tracking-[0.2em]">Gemini 3 Flash</p>
         <h3 class="text-sm font-black">챗봇</h3>
       </div>
-      <button id="chat-close" class="text-[11px] mono text-white/50">X</button>
+      <div class="chat-header-actions">
+        <button id="chat-new-inline" class="icon-btn icon-sm text-white/45 hover:text-cyan-200" aria-label="새 대화">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
+          </svg>
+        </button>
+        <button id="chat-close" class="text-[11px] mono text-white/50">X</button>
+      </div>
     </div>
     <div class="chat-body">
       <div class="chat-tabs">
@@ -267,6 +275,24 @@
       </div>
 
       <div class="chat-view active" data-chat-view="chat">
+        <div class="chat-toolbar">
+          <label class="chat-control">
+            <span class="chat-control-label">THINK</span>
+            <select id="chat-thinking-quick" class="chat-select">
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </label>
+          <label class="chat-control">
+            <span class="chat-control-label">PROMPT</span>
+            <select id="chat-prompt-quick" class="chat-select"></select>
+          </label>
+          <label class="chat-control">
+            <span class="chat-control-label">MODEL</span>
+            <input id="chat-model-quick" class="chat-select" type="text" placeholder="gemini-3-flash-preview" />
+          </label>
+        </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input">
           <textarea id="chat-input" class="field px-3 py-2 text-[12px]" placeholder="메시지 입력..."></textarea>
@@ -276,7 +302,12 @@
 
       <div class="chat-view" data-chat-view="history">
         <div class="chat-history">
-          <button id="chat-new" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">새 대화</button>
+          <button id="chat-new" class="icon-btn text-white/45 hover:text-cyan-200" aria-label="새 대화">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
+            </svg>
+          </button>
           <div id="chat-session-list" class="mt-3 space-y-2"></div>
         </div>
       </div>
@@ -286,16 +317,6 @@
           <div class="notice">Gemini 호출은 Vercel 백엔드에서 처리됩니다. 서버 URL을 입력해 주세요.</div>
           <label class="text-[11px] text-white/60">SERVER URL</label>
           <input id="chat-server-url" type="url" class="field px-3 py-2 text-[12px]" placeholder="https://YOUR-VERCEL-APP.vercel.app" />
-          <label class="text-[11px] text-white/60">PROMPT</label>
-          <select id="chat-prompt" class="field w-full px-3 py-2 text-[12px]"></select>
-          <label class="text-[11px] text-white/60">THINKING LEVEL</label>
-          <select id="chat-thinking" class="field w-full px-3 py-2 text-[12px]">
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
-          </select>
-          <label class="text-[11px] text-white/60">MODEL</label>
-          <input id="chat-model" class="field px-3 py-2 text-[12px]" placeholder="gemini-3-flash-preview" />
           <button id="chat-save" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">설정 저장</button>
           <button id="chat-clear" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">현재 대화 초기화</button>
         </div>

@@ -149,11 +149,12 @@ export function initChat({ showToast } = {}) {
 
   const sessionsEl = qs("#chat-session-list");
   const newBtn = qs("#chat-new");
+  const newInlineBtn = qs("#chat-new-inline");
 
   const serverUrlEl = qs("#chat-server-url");
-  const promptEl = qs("#chat-prompt");
-  const thinkingEl = qs("#chat-thinking");
-  const modelEl = qs("#chat-model");
+  const promptQuickEl = qs("#chat-prompt-quick");
+  const thinkingQuickEl = qs("#chat-thinking-quick");
+  const modelQuickEl = qs("#chat-model-quick");
   const saveBtn = qs("#chat-save");
   const clearBtn = qs("#chat-clear");
 
@@ -168,9 +169,9 @@ export function initChat({ showToast } = {}) {
 
   const applySettingsFromInputs = () => {
     if (serverUrlEl) state.settings.serverUrl = serverUrlEl.value.trim();
-    if (promptEl) state.settings.promptId = promptEl.value || "searchmode";
-    if (thinkingEl) state.settings.thinkingLevel = thinkingEl.value || "medium";
-    if (modelEl) state.settings.model = modelEl.value.trim() || "gemini-3-flash-preview";
+    if (promptQuickEl) state.settings.promptId = promptQuickEl.value || "searchmode";
+    if (thinkingQuickEl) state.settings.thinkingLevel = thinkingQuickEl.value || "medium";
+    if (modelQuickEl) state.settings.model = modelQuickEl.value.trim() || "gemini-3-flash-preview";
   };
 
   const openCanvas = (html) => {
@@ -260,14 +261,17 @@ export function initChat({ showToast } = {}) {
     messagesEl.scrollTop = messagesEl.scrollHeight;
   };
 
+  const renderQuickControls = () => {
+    if (promptQuickEl) {
+      promptQuickEl.innerHTML = PROMPTS.map((prompt) => `<option value="${prompt.id}">${prompt.name}</option>`).join("");
+      promptQuickEl.value = state.settings.promptId || "searchmode";
+    }
+    if (thinkingQuickEl) thinkingQuickEl.value = state.settings.thinkingLevel || "medium";
+    if (modelQuickEl) modelQuickEl.value = state.settings.model || "gemini-3-flash-preview";
+  };
+
   const renderSettings = () => {
     if (serverUrlEl) serverUrlEl.value = state.settings.serverUrl || "";
-    if (promptEl) {
-      promptEl.innerHTML = PROMPTS.map((prompt) => `<option value="${prompt.id}">${prompt.name}</option>`).join("");
-      promptEl.value = state.settings.promptId || "searchmode";
-    }
-    if (thinkingEl) thinkingEl.value = state.settings.thinkingLevel || "medium";
-    if (modelEl) modelEl.value = state.settings.model || "gemini-3-flash-preview";
   };
 
   const setTab = (tabId) => {
@@ -296,6 +300,17 @@ export function initChat({ showToast } = {}) {
     scheduleSave();
     renderMessages();
     renderSessions();
+  };
+
+  const startNewSession = () => {
+    const session = createSession();
+    state.sessions.unshift(session);
+    trimSessions();
+    state.activeSessionId = session.id;
+    scheduleSave();
+    renderSessions();
+    renderMessages();
+    setTab("chat");
   };
 
   const sendMessage = async () => {
@@ -350,7 +365,12 @@ export function initChat({ showToast } = {}) {
     }
   };
 
-  toggleBtn?.addEventListener("click", () => panel?.classList.toggle("open"));
+  toggleBtn?.addEventListener("click", () => {
+    panel?.classList.toggle("open");
+    if (panel?.classList.contains("open")) {
+      renderMessages();
+    }
+  });
   closeBtn?.addEventListener("click", () => panel?.classList.remove("open"));
 
   tabButtons.forEach((btn) => {
@@ -365,16 +385,8 @@ export function initChat({ showToast } = {}) {
     }
   });
 
-  newBtn?.addEventListener("click", () => {
-    const session = createSession();
-    state.sessions.unshift(session);
-    trimSessions();
-    state.activeSessionId = session.id;
-    scheduleSave();
-    renderSessions();
-    renderMessages();
-    setTab("chat");
-  });
+  newBtn?.addEventListener("click", startNewSession);
+  newInlineBtn?.addEventListener("click", startNewSession);
 
   sessionsEl?.addEventListener("click", (e) => {
     const renameBtn = e.target.closest("[data-session-rename]");
@@ -437,16 +449,20 @@ export function initChat({ showToast } = {}) {
     state.settings.serverUrl = serverUrlEl.value.trim();
     scheduleSave();
   });
-  promptEl?.addEventListener("change", () => {
-    state.settings.promptId = promptEl.value;
+  promptQuickEl?.addEventListener("change", () => {
+    state.settings.promptId = promptQuickEl.value || "searchmode";
     scheduleSave();
   });
-  thinkingEl?.addEventListener("change", () => {
-    state.settings.thinkingLevel = thinkingEl.value;
+  thinkingQuickEl?.addEventListener("change", () => {
+    state.settings.thinkingLevel = thinkingQuickEl.value || "medium";
     scheduleSave();
   });
-  modelEl?.addEventListener("change", () => {
-    state.settings.model = modelEl.value.trim() || "gemini-3-flash-preview";
+  modelQuickEl?.addEventListener("change", () => {
+    state.settings.model = modelQuickEl.value.trim() || "gemini-3-flash-preview";
+    scheduleSave();
+  });
+  modelQuickEl?.addEventListener("input", () => {
+    state.settings.model = modelQuickEl.value.trim() || "gemini-3-flash-preview";
     scheduleSave();
   });
   saveBtn?.addEventListener("click", () => {
@@ -470,6 +486,7 @@ export function initChat({ showToast } = {}) {
   trimSessions();
   renderSessions();
   renderMessages();
+  renderQuickControls();
   renderSettings();
   setTab("chat");
 

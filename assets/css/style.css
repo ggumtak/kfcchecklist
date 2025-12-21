@@ -533,13 +533,14 @@ button:disabled{
   z-index:80;
   width:min(92vw,420px);
   height:min(80vh,640px);
-  background:rgba(15,18,24,0.96);
+  background:rgba(6,8,12,0.98);
   border:1px solid rgba(34,211,238,0.18);
   border-radius:calc(var(--radius) + 6px);
   box-shadow:0 24px 70px rgba(0,0,0,0.65);
   display:none;
   flex-direction:column;
   overflow:hidden;
+  touch-action:pan-y;
 }
 .chat-panel.open{ display:flex; }
 .chat-header{
@@ -549,10 +550,16 @@ button:disabled{
   justify-content:space-between;
   border-bottom:1px solid rgba(255,255,255,0.06);
 }
+.chat-header-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
 .chat-body{
   flex:1;
   display:flex;
   flex-direction:column;
+  min-height:0;
 }
 .chat-tabs{
   display:flex;
@@ -578,8 +585,45 @@ button:disabled{
   flex:1;
   display:none;
   flex-direction:column;
+  min-height:0;
 }
 .chat-view.active{ display:flex; }
+.chat-toolbar{
+  display:flex;
+  gap:10px;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  overflow-x:auto;
+}
+.chat-toolbar::-webkit-scrollbar{ height:0; }
+.chat-control{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:120px;
+  flex:0 0 auto;
+}
+.chat-control-label{
+  font-size:9px;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.45);
+  font-family:'JetBrains Mono',monospace;
+}
+.chat-select{
+  background:#14171d;
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:10px;
+  color:rgba(255,255,255,0.85);
+  padding:6px 10px;
+  font-size:11px;
+  min-width:120px;
+  outline:none;
+}
+.chat-select:focus{
+  border-color:rgba(34,211,238,0.35);
+  box-shadow:0 0 0 2px rgba(34,211,238,0.1);
+}
 .chat-messages{
   flex:1;
   overflow-y:auto;
@@ -587,6 +631,10 @@ button:disabled{
   display:flex;
   flex-direction:column;
   gap:10px;
+  min-height:0;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
 }
 .chat-msg{
   padding:10px 12px;
@@ -686,6 +734,10 @@ button:disabled{
   padding:12px;
   gap:10px;
   overflow-y:auto;
+  min-height:0;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
 }
 .chat-history-item{
   display:flex;
@@ -734,6 +786,10 @@ button:disabled{
   padding:12px;
   gap:12px;
   overflow-y:auto;
+  min-height:0;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
 }
 
 .media-preview{
