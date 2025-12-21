@@ -1,4 +1,4 @@
-const CACHE_NAME = "kfc-checklist-v19";
+const CACHE_NAME = "kfc-checklist-v20";
 const ASSETS = [
   "./",
   "./index.html",

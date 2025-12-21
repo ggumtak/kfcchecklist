@@ -111,6 +111,7 @@ export default async function handler(req, res) {
   const model = typeof body?.model === "string" && body.model.trim()
     ? body.model.trim()
     : "gemini-3-flash-preview";
+  const useSearchTool = body?.useSearchTool !== false;
 
   try {
     const promptText = await getPromptText(promptId);
@@ -118,21 +119,37 @@ export default async function handler(req, res) {
       console.warn("[api/chat] prompt missing", { promptId, requestedPromptId });
     }
     const ai = new GoogleGenAI({ apiKey });
-    const config = {
+    const baseConfig = {
       thinkingConfig: { thinkingLevel }
     };
-    if (promptText) config.systemInstruction = promptText;
+    if (promptText) baseConfig.systemInstruction = promptText;
+    if (useSearchTool) baseConfig.tools = [{ type: "google_search" }];
 
     const contents = messages.map((msg) => ({
       role: msg.role,
       parts: [{ text: msg.text }]
     }));
 
-    const response = await ai.models.generateContent({
-      model,
-      contents,
-      config
-    });
+    let response;
+    let searchFallback = false;
+    try {
+      response = await ai.models.generateContent({
+        model,
+        contents,
+        config: baseConfig
+      });
+    } catch (err) {
+      if (useSearchTool) {
+        searchFallback = true;
+        response = await ai.models.generateContent({
+          model,
+          contents,
+          config: promptText ? { ...baseConfig, tools: undefined } : { thinkingConfig: { thinkingLevel } }
+        });
+      } else {
+        throw err;
+      }
+    }
 
     res.status(200).json({
       text: response?.text || "",
@@ -141,7 +158,9 @@ export default async function handler(req, res) {
         promptId,
         requestedPromptId,
         promptChars: promptText.length,
-        thinkingLevel
+        thinkingLevel,
+        searchEnabled: useSearchTool,
+        searchFallback
       }
     });
   } catch (err) {

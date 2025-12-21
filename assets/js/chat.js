@@ -336,6 +336,7 @@ export function initChat({ showToast } = {}) {
         promptId: state.settings.promptId || "searchmode",
         thinkingLevel: state.settings.thinkingLevel || "medium",
         model: state.settings.model || "gemini-3-flash-preview",
+        useSearchTool: true,
         messages: session.messages
           .filter((msg) => msg.text !== thinkingMsg)
           .map((msg) => ({ role: msg.role, text: msg.text }))
@@ -357,6 +358,9 @@ export function initChat({ showToast } = {}) {
           toast("프롬프트 로드 실패: 서버 확인 필요");
         } else if (meta.promptId && meta.requestedPromptId && meta.promptId !== meta.requestedPromptId) {
           toast("요청 프롬프트를 못 찾아 기본값으로 전환됨");
+        }
+        if (meta.searchFallback) {
+          toast("검색 도구 오류: 일반 응답으로 전환됨");
         }
         if (meta.thinkingLevel && meta.thinkingLevel !== state.settings.thinkingLevel) {
           state.settings.thinkingLevel = meta.thinkingLevel;
