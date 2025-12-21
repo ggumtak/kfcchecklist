@@ -5,7 +5,7 @@ export const CHAT_STORAGE_KEY = "kfc_chat_state_v1";
 
 export const GUIDE_TAB = { id: "guide", name: "외국인 응대" };
 
-const DEFAULT_POSITION_ORDER = ["kitchen", "back", "counter"];
+const DEFAULT_POSITION_ORDER = ["back", "kitchen", "counter"];
 
 const kitchenStartTasks = [
   { id: "ks-1", text: "해동표찰" },
@@ -66,16 +66,14 @@ export function createDefaultState(){
   return {
     version: APP_VERSION,
     lastPunchDate: "",
-    activeTab: "kitchen",
+    activeTab: "back",
     positionOrder: [...DEFAULT_POSITION_ORDER],
     positions: {
       kitchen: {
         id: "kitchen",
         name: "주방",
         categories: [
-          { id: "kitchen-start", name: "마감 시작", tasks: kitchenStartTasks.map(t => ({ ...t, done: false })) },
-          { id: "kitchen-mid", name: "중간 마감", tasks: kitchenMidTasks.map(t => ({ ...t, done: false })) },
-          { id: "kitchen-late", name: "9시 반 마감", tasks: kitchenLateTasks.map(t => ({ ...t, done: false })) }
+          { id: "kitchen-default", name: "주방 업무", tasks: [] }
         ]
       },
       back: {
@@ -90,18 +88,19 @@ export function createDefaultState(){
         id: "counter",
         name: "카운터",
         categories: [
-          { id: "counter-default", name: "카운터 마감", tasks: [] }
+          { id: "counter-default", name: "카운터 업무", tasks: [] }
         ]
       }
     },
     carry: DEFAULT_CARRY.map(item => ({ ...item })),
     ui: {
       collapsed: {},
-      restockFilter: {}
+      restockFilter: {},
+      focusMode: false
     },
     preferences: {
       showCarry: true,
-      defaultTab: "kitchen"
+      defaultTab: "back"
     }
   };
 }

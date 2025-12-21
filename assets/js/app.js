@@ -40,6 +40,10 @@ function syncPositionOrder() {
       seen.add(id);
     }
   });
+  if (next.includes("back")) {
+    state.positionOrder = ["back", ...next.filter((id) => id !== "back")];
+    return;
+  }
   state.positionOrder = next;
 }
 
@@ -351,6 +355,7 @@ function setActiveTab(tabId) {
   renderActiveTab();
   const container = mainContent();
   if (container) container.scrollTop = 0;
+  window.scrollTo(0, 0);
   refreshProgressUI();
   safeVibrate(10);
 }
@@ -379,22 +384,22 @@ function taskCardHTML(task, posId, catId, mode = "default") {
   const modeClass = mode === "restock" ? "restock-card" : "";
 
   return `
-    <div class="square-card task-card p-5 flex items-center justify-between transition-all ${doneClass} ${modeClass}"
+    <div class="square-card task-card p-3 flex items-center justify-between transition-all ${doneClass} ${modeClass}"
          data-task-id="${task.id}" data-cat-id="${catId}" data-pos-id="${posId}">
-      <button class="flex items-center gap-4 flex-1 text-left"
+      <button class="flex items-center gap-3 flex-1 text-left"
               data-action="toggle-task" data-task-id="${task.id}">
         <div class="${checkClass}">${check}</div>
-        <span class="text-[15px] font-bold tracking-tight ${textClass}" data-task-text>${escapeHtml(
+        <span class="text-[13px] font-bold tracking-tight ${textClass}" data-task-text>${escapeHtml(
     task.text
   )}</span>
       </button>
 
       <div class="flex items-center gap-2">
-        <button class="text-white/20 hover:text-cyan-200 p-2 transition-colors"
+        <button class="text-white/20 hover:text-cyan-200 p-1 transition-colors"
                 data-action="edit-task" data-task-id="${task.id}" aria-label="edit">
           EDIT
         </button>
-        <button class="text-white/10 hover:text-red-500/60 p-2 transition-colors"
+        <button class="text-white/10 hover:text-red-500/60 p-1 transition-colors"
                 data-action="delete-task" data-task-id="${task.id}" aria-label="delete">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -410,7 +415,7 @@ function renderCarryPanelHTML() {
   const rows = state.carry.map(carryRowHTML).join("");
   return `
     <section class="space-y-3 fade-in">
-      <div class="square-card p-5">
+      <div class="square-card p-4">
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="flex items-center gap-2">
@@ -436,11 +441,11 @@ function renderCarryPanelHTML() {
           </div>
         </div>
 
-        <div class="mt-4 grid gap-2" id="carry-list">
+        <div class="mt-3 grid gap-2" id="carry-list">
           ${rows}
         </div>
 
-        <div class="mt-4 text-[10px] mono text-white/25">
+        <div class="mt-3 text-[10px] mono text-white/25">
           TIP: 수량칸은 비워두고, 필요한 개수만 입력 → COPY. (회색 숫자는 기준 힌트)
         </div>
       </div>
@@ -456,13 +461,13 @@ function carryRowHTML(item) {
   return `
     <div class="carry-row">
       <input
-        class="field carry-name px-3 py-3 text-[12px] font-bold"
+        class="field carry-name px-3 py-2 text-[12px] font-bold"
         data-action="carry-name"
         data-carry-id="${item.id}"
         value="${safeName}"
         placeholder="항목명" />
       <input
-        class="field carry-qty px-3 py-3 text-[12px] font-black text-cyan-200 mono text-center"
+        class="field carry-qty px-3 py-2 text-[12px] font-black text-cyan-200 mono text-center"
         type="tel" inputmode="numeric" pattern="[0-9]*"
         data-action="carry-qty"
         data-carry-id="${item.id}"
@@ -470,7 +475,7 @@ function carryRowHTML(item) {
         placeholder="${hint}"
         value="${value}" />
       <button
-        class="carry-del px-3 py-3 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/40 hover:text-red-400"
+        class="carry-del px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/40 hover:text-red-400"
         data-action="carry-del"
         data-carry-id="${item.id}"
         aria-label="carry delete">
@@ -552,6 +557,23 @@ function resetRestockCategory(catId) {
   refreshProgressUI();
   showToast("보충 목록 초기화");
   safeVibrate([15, 30, 15]);
+}
+
+function applyFocusMode() {
+  const focusOn = !!state.ui?.focusMode;
+  document.body.classList.toggle("focus-mode", focusOn);
+  const exitBtn = qs("#focus-exit");
+  if (exitBtn) exitBtn.classList.toggle("open", focusOn);
+  if (focusOn) {
+    qs("#chat-panel")?.classList.remove("open");
+  }
+}
+
+function toggleFocusMode() {
+  if (!state.ui) state.ui = {};
+  state.ui.focusMode = !state.ui.focusMode;
+  scheduleSave();
+  applyFocusMode();
 }
 
 function addPosition(position, makeActive = true) {
@@ -771,7 +793,7 @@ function renderCategories(position) {
 
   position.categories.forEach((cat) => {
     const section = document.createElement("section");
-    section.className = "space-y-4 fade-in";
+    section.className = "space-y-3 fade-in";
     section.dataset.catId = cat.id;
 
     const collapsed = isCollapsed(cat.id);
@@ -822,9 +844,9 @@ function renderCategories(position) {
         </div>
       </div>
 
-      <div id="sec-body-${cat.id}" class="${collapsed ? "hidden" : ""} space-y-3">
+      <div id="sec-body-${cat.id}" class="${collapsed ? "hidden" : ""} space-y-2">
         ${restockHint}
-        <div class="grid gap-3" id="list-${cat.id}">
+        <div class="grid gap-2" id="list-${cat.id}">
           ${visibleTasks.map((task) => taskCardHTML(task, position.id, cat.id, cat.mode)).join("")}
         </div>
 
@@ -1274,11 +1296,16 @@ function punchOutAndReset() {
   safeVibrate([25, 40, 25]);
 }
 
-function punchIn() {
+function punchIn(targetTab) {
   const todayKey = getLocalDateKey(new Date());
   if (state.lastPunchDate !== todayKey) {
     resetAllTasks();
     state.lastPunchDate = todayKey;
+    scheduleSave();
+  }
+
+  if (targetTab && state.positions[targetTab]) {
+    state.activeTab = targetTab;
     scheduleSave();
   }
 
@@ -1291,6 +1318,7 @@ function punchIn() {
     }, 500);
   }
   qs("#footer-status")?.classList.remove("hidden");
+  renderTabs();
   renderActiveTab();
   refreshProgressUI();
   safeVibrate([20]);
@@ -1592,6 +1620,7 @@ function initSettings() {
       renderTabs();
       renderActiveTab();
       refreshProgressUI();
+      applyFocusMode();
       updateDefaultOptions();
       renderTabManager();
       showToast("불러오기 완료");
@@ -1608,6 +1637,7 @@ function initSettings() {
     renderTabs();
     renderActiveTab();
     refreshProgressUI();
+    applyFocusMode();
     updateDefaultOptions();
     renderTabManager();
   });
@@ -1636,7 +1666,8 @@ function initEventHandlers() {
   });
 
   qs("#btn-punch-out")?.addEventListener("click", punchOutAndReset);
-  qs("#btn-punch-in")?.addEventListener("click", punchIn);
+  qs("#btn-punch-back")?.addEventListener("click", () => punchIn("back"));
+  qs("#btn-punch-counter")?.addEventListener("click", () => punchIn("counter"));
   qs("#btn-factory-reset")?.addEventListener("click", () => {
     if (!confirm("모든 설정을 초기화하고 기본 리스트로 돌아갈까요?")) return;
     state = loadState();
@@ -1644,7 +1675,11 @@ function initEventHandlers() {
     renderTabs();
     renderActiveTab();
     refreshProgressUI();
+    applyFocusMode();
   });
+
+  qs("#btn-focus")?.addEventListener("click", toggleFocusMode);
+  qs("#focus-exit")?.addEventListener("click", toggleFocusMode);
 
   qs("#position-tabs")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-tab-id]");
@@ -1829,6 +1864,7 @@ export function initApp() {
   renderTabs();
   renderActiveTab();
   refreshProgressUI();
+  applyFocusMode();
   initSettings();
   initEventHandlers();
   updateClock();

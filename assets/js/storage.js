@@ -153,6 +153,7 @@ function normalizeState(raw){
   const restockFilter = safe.ui && typeof safe.ui === "object" && safe.ui.restockFilter && typeof safe.ui.restockFilter === "object"
     ? safe.ui.restockFilter
     : {};
+  const focusMode = safe.ui && typeof safe.ui === "object" && safe.ui.focusMode === true;
 
   const prefs = safe.preferences && typeof safe.preferences === "object" ? safe.preferences : {};
 
@@ -165,7 +166,7 @@ function normalizeState(raw){
     positionOrder,
     positions,
     carry: normalizeCarry(safe.carry || defaults.carry),
-    ui: { collapsed, restockFilter },
+    ui: { collapsed, restockFilter, focusMode },
     preferences: {
       showCarry: prefs.showCarry !== false,
       defaultTab: prefs.defaultTab || defaults.preferences.defaultTab

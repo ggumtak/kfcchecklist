@@ -11,21 +11,27 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css" />
 </head>
 <body>
-  <header class="pt-14 pb-4 px-8 border-b border-white/5 flex justify-between items-end bg-black/50 backdrop-blur-lg">
+  <header class="pt-6 pb-2 px-5 border-b border-white/5 flex justify-between items-end bg-black/50 backdrop-blur-lg">
     <div>
-      <p id="system-date" class="text-[10px] mono text-cyan-300 font-bold tracking-widest uppercase mb-1">SYNCING...</p>
-      <h1 id="system-clock" class="text-4xl font-black mono tracking-tighter leading-none">00:00:00</h1>
+      <p id="system-date" class="text-[9px] mono text-cyan-300 font-bold tracking-widest uppercase mb-1">SYNCING...</p>
+      <h1 id="system-clock" class="text-3xl font-black mono tracking-tighter leading-none">00:00:00</h1>
     </div>
-    <div class="text-right space-y-2">
-      <span id="sync-id" class="text-[9px] mono text-white/20 block">KERNEL_V6.0</span>
+    <div class="text-right space-y-1">
+      <span id="sync-id" class="text-[8px] mono text-white/20 block">KERNEL_V6.0</span>
       <div class="flex items-center gap-1.5 justify-end">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span class="text-[10px] mono text-emerald-500 font-bold tracking-widest">ACTIVE</span>
+        <span class="text-[9px] mono text-emerald-500 font-bold tracking-widest">ACTIVE</span>
       </div>
-      <button id="btn-settings"
-        class="text-[9px] mono text-white/40 hover:text-cyan-200 uppercase tracking-widest px-3 py-2 border border-white/10 rounded-[var(--radius)]">
-        SETTINGS
-      </button>
+      <div class="flex items-center gap-2 justify-end">
+        <button id="btn-focus"
+          class="text-[9px] mono text-white/40 hover:text-cyan-200 uppercase tracking-widest px-2.5 py-1.5 border border-white/10 rounded-[var(--radius)]">
+          FOCUS
+        </button>
+        <button id="btn-settings"
+          class="text-[9px] mono text-white/40 hover:text-cyan-200 uppercase tracking-widest px-2.5 py-1.5 border border-white/10 rounded-[var(--radius)]">
+          SETTINGS
+        </button>
+      </div>
     </div>
   </header>
 
@@ -33,42 +39,45 @@
 
   <div id="position-tabs" class="tab-bar"></div>
 
-  <main class="main-scroll px-6 py-8 space-y-12" id="main-content"></main>
+  <main class="main-scroll px-5 py-5 space-y-6" id="main-content"></main>
 
-  <div id="footer-status" class="px-8 py-6 border-t border-white/5 bg-black/90 backdrop-blur-xl hidden">
+  <div id="footer-status" class="px-5 py-3 border-t border-white/5 bg-black/90 backdrop-blur-xl hidden">
     <div class="flex justify-between items-center">
       <div>
         <span class="text-[10px] mono text-white/30 uppercase tracking-[0.2em] block mb-1">Global Completion</span>
         <div class="flex items-end gap-2">
-          <span id="progress-percent" class="text-3xl font-black mono text-cyan-300 leading-none">00%</span>
-          <span id="task-count" class="text-[10px] mono text-white/20 mb-1">0/0 ITEMS</span>
+          <span id="progress-percent" class="text-2xl font-black mono text-cyan-300 leading-none">00%</span>
+          <span id="task-count" class="text-[9px] mono text-white/20 mb-1">0/0 ITEMS</span>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
         <button id="btn-punch-out"
-          class="text-[9px] mono text-white/35 hover:text-cyan-200 uppercase tracking-widest px-3 py-2 border border-white/10 rounded-[var(--radius)]">
+          class="text-[9px] mono text-white/35 hover:text-cyan-200 uppercase tracking-widest px-2 py-1.5 border border-white/10 rounded-[var(--radius)]">
           퇴 근
         </button>
 
         <button id="btn-factory-reset"
-          class="text-[9px] mono text-red-500/40 hover:text-red-500 uppercase tracking-widest px-3 py-2 border border-red-500/10 rounded-[var(--radius)]">
+          class="text-[9px] mono text-red-500/40 hover:text-red-500 uppercase tracking-widest px-2 py-1.5 border border-red-500/10 rounded-[var(--radius)]">
           Factory Reset
         </button>
       </div>
     </div>
   </div>
 
-  <div id="lock-screen" class="fixed inset-0 z-50 bg-[#050608] flex flex-col items-center justify-center p-12">
-    <div class="w-full max-w-sm space-y-16">
+  <div id="lock-screen" class="fixed inset-0 z-50 bg-[#050608] flex flex-col items-center justify-center p-10">
+    <div class="w-full max-w-sm space-y-10">
       <div class="space-y-3">
         <div class="h-1.5 w-16 bg-cyan-400 mb-6"></div>
-        <h2 class="text-4xl font-black tracking-tight leading-[1.05]">
+        <h2 class="text-3xl font-black tracking-tight leading-[1.1]">
           KFC 마감 체크리스트
         </h2>
       </div>
 
-      <button id="btn-punch-in" class="btn-punch-in w-full py-10 text-2xl">출 근</button>
+      <div class="grid gap-3">
+        <button id="btn-punch-back" class="btn-punch-in w-full py-6 text-lg">백 시작</button>
+        <button id="btn-punch-counter" class="btn-punch-in secondary w-full py-6 text-lg">카운터 시작</button>
+      </div>
     </div>
   </div>
 
@@ -90,6 +99,8 @@
       </div>
     </div>
   </div>
+
+  <button id="focus-exit" class="focus-exit">UI</button>
 
   <div id="settings-overlay" class="modal-overlay">
     <div class="settings-panel">
