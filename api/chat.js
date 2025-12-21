@@ -9,6 +9,7 @@ const PROMPT_FILES = {
   "ailey-bailey-x": "prompts/ailey-bailey-x-251023.txt"
 };
 
+const DEFAULT_PROMPT_ID = "searchmode";
 const ALLOWED_THINKING = new Set(["low", "medium", "high"]);
 const MAX_MESSAGES = 40;
 const promptCache = new Map();
@@ -104,7 +105,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  const promptId = typeof body?.promptId === "string" ? body.promptId : "searchmode";
+  const requestedPromptId = typeof body?.promptId === "string" ? body.promptId : DEFAULT_PROMPT_ID;
+  const promptId = PROMPT_FILES[requestedPromptId] ? requestedPromptId : DEFAULT_PROMPT_ID;
   const thinkingLevel = ALLOWED_THINKING.has(body?.thinkingLevel) ? body.thinkingLevel : "medium";
   const model = typeof body?.model === "string" && body.model.trim()
     ? body.model.trim()
@@ -112,6 +114,9 @@ export default async function handler(req, res) {
 
   try {
     const promptText = await getPromptText(promptId);
+    if (!promptText) {
+      console.warn("[api/chat] prompt missing", { promptId, requestedPromptId });
+    }
     const ai = new GoogleGenAI({ apiKey });
     const config = {
       thinkingConfig: { thinkingLevel }
@@ -131,7 +136,13 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       text: response?.text || "",
-      model: response?.modelVersion || model
+      model: response?.modelVersion || model,
+      meta: {
+        promptId,
+        requestedPromptId,
+        promptChars: promptText.length,
+        thinkingLevel
+      }
     });
   } catch (err) {
     console.warn("[api/chat] request failed", err);

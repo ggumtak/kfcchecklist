@@ -350,6 +350,21 @@ export function initChat({ showToast } = {}) {
       if (!response.ok) {
         throw new Error(data?.error || "요청 실패");
       }
+
+      const meta = data?.meta;
+      if (meta) {
+        if (!meta.promptChars) {
+          toast("프롬프트 로드 실패: 서버 확인 필요");
+        } else if (meta.promptId && meta.requestedPromptId && meta.promptId !== meta.requestedPromptId) {
+          toast("요청 프롬프트를 못 찾아 기본값으로 전환됨");
+        }
+        if (meta.thinkingLevel && meta.thinkingLevel !== state.settings.thinkingLevel) {
+          state.settings.thinkingLevel = meta.thinkingLevel;
+          scheduleSave();
+          renderQuickControls();
+        }
+      }
+
       const resultText = data?.text || "응답이 비어있어";
       session.messages = session.messages.filter((msg) => msg.text !== thinkingMsg);
       addMessage("model", resultText);
