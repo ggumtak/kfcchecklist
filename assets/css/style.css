@@ -120,6 +120,15 @@ h1,h2,h3,h4{
   transform:scale(0.985);
   touch-action:none;
 }
+.drag-ghost{
+  transform:none !important;
+  box-shadow:0 16px 40px rgba(0,0,0,0.45);
+}
+.drag-placeholder{
+  border:1px dashed rgba(185,153,122,0.4);
+  border-radius:var(--radius);
+  background:rgba(185,153,122,0.08);
+}
 .task-card{
   -webkit-touch-callout:none;
   user-select:none;

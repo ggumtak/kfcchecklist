@@ -16,6 +16,11 @@ const dragState = {
   startY: 0,
   longPressTimer: null,
   suppressClickUntil: 0,
+  placeholder: null,
+  originParent: null,
+  originNextSibling: null,
+  dragOffsetX: 0,
+  dragOffsetY: 0,
   prevBodyOverflow: "",
   prevBodyOverscroll: "",
   prevContentTouch: "",
@@ -825,13 +830,36 @@ function clearDragTimer() {
   }
 }
 
-function startDrag(card, catId, pointerId, type = "task") {
+function startDrag(card, catId, pointerId, type = "task", clientX = dragState.startX, clientY = dragState.startY) {
+  if (!card) return;
+  const rect = card.getBoundingClientRect();
+  const placeholder = document.createElement("div");
+  placeholder.className = "drag-placeholder";
+  placeholder.style.height = `${rect.height}px`;
+  placeholder.style.width = `${rect.width}px`;
+  dragState.originParent = card.parentElement;
+  dragState.originNextSibling = card.nextElementSibling;
+  dragState.placeholder = placeholder;
+
+  if (dragState.originParent) {
+    dragState.originParent.insertBefore(placeholder, card);
+  }
+  document.body.appendChild(card);
   dragState.active = true;
   dragState.type = type;
   dragState.card = card;
   dragState.catId = catId;
   dragState.pointerId = pointerId;
   card.classList.add("dragging");
+  card.classList.add("drag-ghost");
+  card.style.position = "fixed";
+  card.style.top = `${rect.top}px`;
+  card.style.left = `${rect.left}px`;
+  card.style.width = `${rect.width}px`;
+  card.style.zIndex = "1000";
+  card.style.pointerEvents = "none";
+  dragState.dragOffsetX = clientX - rect.left;
+  dragState.dragOffsetY = clientY - rect.top;
   document.body.classList.add("dragging-body");
   dragState.prevBodyOverflow = document.body.style.overflow;
   dragState.prevBodyOverscroll = document.body.style.overscrollBehaviorY;
@@ -872,7 +900,27 @@ function reorderCategoriesFromDOM() {
 function endDrag(commit = true) {
   clearDragTimer();
   if (!dragState.active) return;
-  if (dragState.card) dragState.card.classList.remove("dragging");
+  const card = dragState.card;
+  const placeholder = dragState.placeholder;
+  if (card) {
+    card.classList.remove("dragging", "drag-ghost");
+    card.style.position = "";
+    card.style.top = "";
+    card.style.left = "";
+    card.style.width = "";
+    card.style.zIndex = "";
+    card.style.pointerEvents = "";
+  }
+  if (placeholder && placeholder.parentElement && card) {
+    if (commit) {
+      placeholder.parentElement.insertBefore(card, placeholder);
+    } else if (dragState.originParent) {
+      dragState.originParent.insertBefore(card, dragState.originNextSibling);
+    }
+    placeholder.remove();
+  } else if (!commit && dragState.originParent && card) {
+    dragState.originParent.insertBefore(card, dragState.originNextSibling);
+  }
   if (dragState.card && dragState.card.releasePointerCapture) {
     try {
       dragState.card.releasePointerCapture(dragState.pointerId);
@@ -897,6 +945,11 @@ function endDrag(commit = true) {
   dragState.card = null;
   dragState.catId = null;
   dragState.pointerId = null;
+  dragState.placeholder = null;
+  dragState.originParent = null;
+  dragState.originNextSibling = null;
+  dragState.dragOffsetX = 0;
+  dragState.dragOffsetY = 0;
   dragState.prevBodyOverflow = "";
   dragState.prevBodyOverscroll = "";
   dragState.prevContentTouch = "";
@@ -912,7 +965,7 @@ function handlePointerDown(e) {
   if (header) {
     if (e.target.closest("[data-action]")) return;
     const section = header.closest("section[data-cat-id]");
-    if (!section) return;
+    if (!section || !section.closest("#main-content")) return;
     dragState.startX = e.clientX;
     dragState.startY = e.clientY;
     dragState.card = section;
@@ -920,13 +973,13 @@ function handlePointerDown(e) {
     dragState.pointerId = e.pointerId;
     clearDragTimer();
     dragState.longPressTimer = setTimeout(() => {
-      startDrag(section, dragState.catId, e.pointerId, "category");
+      startDrag(section, dragState.catId, e.pointerId, "category", dragState.startX, dragState.startY);
     }, DRAG_LONG_PRESS_MS);
     return;
   }
 
   const card = e.target.closest(".task-card");
-  if (!card) return;
+  if (!card || !card.closest("#main-content")) return;
   if (e.target.closest("[data-action=\"delete-task\"], [data-action=\"edit-task\"], [data-action=\"toggle-carry-panel\"], [data-action=\"open-camera\"], [data-action=\"open-gallery\"]")) return;
   dragState.startX = e.clientX;
   dragState.startY = e.clientY;
@@ -935,7 +988,7 @@ function handlePointerDown(e) {
   dragState.pointerId = e.pointerId;
   clearDragTimer();
   dragState.longPressTimer = setTimeout(() => {
-    startDrag(card, dragState.catId, e.pointerId, "task");
+    startDrag(card, dragState.catId, e.pointerId, "task", dragState.startX, dragState.startY);
   }, DRAG_LONG_PRESS_MS);
 }
 
@@ -951,37 +1004,41 @@ function handlePointerMove(e) {
   if (!dragState.active || dragState.pointerId !== e.pointerId) return;
 
   e.preventDefault();
+  if (dragState.card) {
+    dragState.card.style.top = `${e.clientY - dragState.dragOffsetY}px`;
+    dragState.card.style.left = `${e.clientX - dragState.dragOffsetX}px`;
+  }
 
   if (dragState.type === "category") {
     const container = mainContent();
-    if (!container || !dragState.card) return;
+    if (!container || !dragState.placeholder) return;
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const target = el?.closest(".category-section");
-    if (!target || target === dragState.card) return;
+    if (!target || target === dragState.placeholder) return;
     const rect = target.getBoundingClientRect();
     const before = e.clientY < rect.top + rect.height / 2;
     if (before) {
-      container.insertBefore(dragState.card, target);
+      container.insertBefore(dragState.placeholder, target);
     } else {
-      container.insertBefore(dragState.card, target.nextSibling);
+      container.insertBefore(dragState.placeholder, target.nextSibling);
     }
     return;
   }
 
   const list = qs(`#list-${dragState.catId}`);
-  if (!list || !dragState.card) return;
+  if (!list || !dragState.placeholder) return;
 
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const target = el?.closest(".task-card");
-  if (!target || target === dragState.card) return;
+  if (!target || target === dragState.placeholder) return;
   if (target.dataset.catId !== dragState.catId) return;
 
   const rect = target.getBoundingClientRect();
   const before = e.clientY < rect.top + rect.height / 2;
   if (before) {
-    list.insertBefore(dragState.card, target);
+    list.insertBefore(dragState.placeholder, target);
   } else {
-    list.insertBefore(dragState.card, target.nextSibling);
+    list.insertBefore(dragState.placeholder, target.nextSibling);
   }
 }
 

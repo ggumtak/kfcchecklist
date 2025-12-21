@@ -375,8 +375,9 @@ export function initChat({ showToast } = {}) {
 
   const addMessage = (role, text) => {
     const session = getActiveSession();
-    if (!session) return;
-    session.messages.push(createMessage(role, text));
+    if (!session) return null;
+    const msg = createMessage(role, text);
+    session.messages.push(msg);
     if (session.messages.length > MAX_MESSAGES) {
       session.messages = session.messages.slice(-MAX_MESSAGES);
     }
@@ -387,6 +388,55 @@ export function initChat({ showToast } = {}) {
     scheduleSave();
     renderMessages();
     renderSessions();
+    return msg.id;
+  };
+
+  const updateMessageText = (msgId, text, final = false) => {
+    const session = getActiveSession();
+    if (!session || !msgId) return;
+    const msg = session.messages.find((item) => item.id === msgId);
+    if (!msg) return;
+    msg.text = text;
+    if (!messagesEl) return;
+    const msgEl = messagesEl.querySelector(`[data-msg-id="${msgId}"]`);
+    const body = msgEl?.querySelector(".chat-msg-body");
+    if (body) {
+      body.innerHTML = renderMarkdown(text);
+    } else if (final) {
+      renderMessages();
+      return;
+    }
+    if (final) {
+      renderMessages();
+      scheduleSave();
+    } else {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  };
+
+  const streamMessageText = (msgId, fullText) => {
+    const text = String(fullText || "");
+    const chars = Array.from(text);
+    const total = chars.length;
+    if (total === 0) {
+      updateMessageText(msgId, "", true);
+      return Promise.resolve();
+    }
+    const chunk = Math.max(1, Math.round(total / 120));
+    let index = 0;
+    return new Promise((resolve) => {
+      const tick = () => {
+        index = Math.min(total, index + chunk);
+        const partial = chars.slice(0, index).join("");
+        updateMessageText(msgId, partial, index >= total);
+        if (index >= total) {
+          resolve();
+          return;
+        }
+        setTimeout(tick, 16);
+      };
+      tick();
+    });
   };
 
   const startNewSession = () => {
@@ -414,7 +464,7 @@ export function initChat({ showToast } = {}) {
 
     if (sendBtn) sendBtn.disabled = true;
     const thinkingMsg = "...";
-    addMessage("model", thinkingMsg);
+    const thinkingId = addMessage("model", thinkingMsg);
 
     try {
       const session = getActiveSession();
@@ -426,7 +476,7 @@ export function initChat({ showToast } = {}) {
         useSearchTool: true,
         screenContext: buildScreenContext(),
         messages: session.messages
-          .filter((msg) => msg.text !== thinkingMsg)
+          .filter((msg) => msg.id !== thinkingId)
           .map((msg) => ({ role: msg.role, text: msg.text }))
       };
 
@@ -458,14 +508,9 @@ export function initChat({ showToast } = {}) {
       }
 
       const resultText = data?.text || "응답이 비어있어";
-      session.messages = session.messages.filter((msg) => msg.text !== thinkingMsg);
-      addMessage("model", resultText);
+      await streamMessageText(thinkingId, resultText);
     } catch (err) {
-      const session = getActiveSession();
-      if (session) {
-        session.messages = session.messages.filter((msg) => msg.text !== thinkingMsg);
-      }
-      addMessage("model", "응답 실패. 네트워크/서버 설정 확인해줘");
+      updateMessageText(thinkingId, "응답 실패. 네트워크/서버 설정 확인해줘", true);
       console.warn(err);
     } finally {
       if (sendBtn) sendBtn.disabled = false;
