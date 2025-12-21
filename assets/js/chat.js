@@ -1,11 +1,10 @@
 ﻿import { CHAT_STORAGE_KEY } from "./data.js";
 import { qs, escapeHtml, createId, debounce } from "./utils.js";
-import { createClient } from "google-genai";
 
 const PROMPTS = [
-  { id: "searchmode", name: "SearchMode_251124", path: "prompts/searchmode_251124.txt" },
-  { id: "ailey-debate", name: "Ailey Debate (v1213)", path: "prompts/ailey-debate-v1213.txt" },
-  { id: "ailey-bailey-x", name: "Ailey & Bailey X_251023", path: "prompts/ailey-bailey-x-251023.txt" }
+  { id: "searchmode", name: "SearchMode_251124" },
+  { id: "ailey-debate", name: "Ailey Debate (v1213)" },
+  { id: "ailey-bailey-x", name: "Ailey & Bailey X_251023" }
 ];
 
 const MAX_SESSIONS = 40;
@@ -37,7 +36,7 @@ function normalizeState(raw) {
     activeSessionId: safe.activeSessionId || (sessions[0]?.id ?? null),
     sessions,
     settings: {
-      apiKey: settings.apiKey || "",
+      serverUrl: settings.serverUrl || "",
       promptId: settings.promptId || "searchmode",
       thinkingLevel: settings.thinkingLevel || "medium",
       model: settings.model || "gemini-3-flash-preview"
@@ -63,30 +62,12 @@ function saveState(state) {
   }
 }
 
-const promptCache = new Map();
-
-async function getPromptText(id) {
-  if (promptCache.has(id)) return promptCache.get(id);
-  const prompt = PROMPTS.find((item) => item.id === id);
-  if (!prompt) return "";
-  try {
-    const res = await fetch(prompt.path, { cache: "no-store" });
-    const text = await res.text();
-    promptCache.set(id, text);
-    return text;
-  } catch (_) {
-    return "";
-  }
-}
-
-function extractText(response) {
-  if (!response) return "";
-  if (response.text) return response.text;
-  const parts = response.candidates?.[0]?.content?.parts;
-  if (Array.isArray(parts)) {
-    return parts.map((part) => part.text || "").join("").trim();
-  }
-  return "";
+function buildEndpoint(rawUrl) {
+  const trimmed = rawUrl.replace(/\/+$/, "");
+  if (!trimmed) return "";
+  if (trimmed.endsWith("/api/chat")) return trimmed;
+  if (trimmed.endsWith("/api")) return `${trimmed}/chat`;
+  return `${trimmed}/api/chat`;
 }
 
 export function initChat({ showToast } = {}) {
@@ -106,7 +87,7 @@ export function initChat({ showToast } = {}) {
   const sessionsEl = qs("#chat-session-list");
   const newBtn = qs("#chat-new");
 
-  const apiKeyEl = qs("#chat-api-key");
+  const serverUrlEl = qs("#chat-server-url");
   const promptEl = qs("#chat-prompt");
   const thinkingEl = qs("#chat-thinking");
   const modelEl = qs("#chat-model");
@@ -164,7 +145,7 @@ export function initChat({ showToast } = {}) {
   };
 
   const renderSettings = () => {
-    if (apiKeyEl) apiKeyEl.value = state.settings.apiKey || "";
+    if (serverUrlEl) serverUrlEl.value = state.settings.serverUrl || "";
     if (promptEl) {
       promptEl.innerHTML = PROMPTS.map((prompt) => `<option value="${prompt.id}">${prompt.name}</option>`).join("");
       promptEl.value = state.settings.promptId || "searchmode";
@@ -203,8 +184,9 @@ export function initChat({ showToast } = {}) {
   const sendMessage = async () => {
     const text = inputEl?.value?.trim();
     if (!text) return;
-    if (!state.settings.apiKey) {
-      toast("API 키를 먼저 입력해줘");
+    const endpoint = buildEndpoint(state.settings.serverUrl || "");
+    if (!endpoint) {
+      toast("서버 URL을 먼저 입력해줘");
       return;
     }
     inputEl.value = "";
@@ -217,24 +199,25 @@ export function initChat({ showToast } = {}) {
     try {
       const session = getActiveSession();
       if (!session) return;
-      const promptText = await getPromptText(state.settings.promptId);
-      const client = createClient({ apiKey: state.settings.apiKey });
-      const config = {
-        thinkingConfig: { thinkingLevel: state.settings.thinkingLevel || "medium" }
-      };
-      if (promptText) config.systemInstruction = promptText;
-
-      const contents = session.messages
-        .filter((msg) => msg.text !== thinkingMsg)
-        .map((msg) => ({ role: msg.role, parts: [{ text: msg.text }] }));
-
-      const response = await client.models.generateContent({
+      const payload = {
+        promptId: state.settings.promptId || "searchmode",
+        thinkingLevel: state.settings.thinkingLevel || "medium",
         model: state.settings.model || "gemini-3-flash-preview",
-        contents,
-        config
-      });
+        messages: session.messages
+          .filter((msg) => msg.text !== thinkingMsg)
+          .map((msg) => ({ role: msg.role, text: msg.text }))
+      };
 
-      const resultText = extractText(response) || "응답이 비어있어";
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "요청 실패");
+      }
+      const resultText = data?.text || "응답이 비어있어";
       session.messages = session.messages.filter((msg) => msg.text !== thinkingMsg);
       addMessage("model", resultText);
     } catch (err) {
@@ -242,7 +225,7 @@ export function initChat({ showToast } = {}) {
       if (session) {
         session.messages = session.messages.filter((msg) => msg.text !== thinkingMsg);
       }
-      addMessage("model", "응답 실패. 네트워크/키 설정 확인해줘");
+      addMessage("model", "응답 실패. 네트워크/서버 설정 확인해줘");
       console.warn(err);
     } finally {
       if (sendBtn) sendBtn.disabled = false;
@@ -301,8 +284,8 @@ export function initChat({ showToast } = {}) {
     setTab("chat");
   });
 
-  apiKeyEl?.addEventListener("change", () => {
-    state.settings.apiKey = apiKeyEl.value.trim();
+  serverUrlEl?.addEventListener("change", () => {
+    state.settings.serverUrl = serverUrlEl.value.trim();
     scheduleSave();
   });
   promptEl?.addEventListener("change", () => {

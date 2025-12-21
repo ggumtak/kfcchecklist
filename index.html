@@ -8,13 +8,6 @@
   <title>REALITY_SYNC_V6 | KFC Checklist</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="assets/css/style.css" />
-  <script type="importmap">
-    {
-      "imports": {
-        "google-genai": "https://esm.run/@google/genai"
-      }
-    }
-  </script>
 </head>
 <body>
   <header class="pt-14 pb-4 px-8 border-b border-white/5 flex justify-between items-end bg-black/50 backdrop-blur-lg">
@@ -192,9 +185,10 @@
 
       <div class="chat-view" data-chat-view="settings">
         <div class="chat-settings space-y-3">
-          <div class="notice">API 키는 브라우저 로컬에 저장됩니다. GitHub에는 올리지 마세요.</div>
-          <label class="text-[11px] text-white/60">API KEY</label>
-          <input id="chat-api-key" type="password" class="field px-3 py-2 text-[12px]" placeholder="Google AI Studio 키" />
+          <div class="notice">Gemini 호출은 Vercel 백엔드에서 처리됩니다. 서버 URL을 입력해 주세요.</div>
+          <label class="text-[11px] text-white/60">SERVER URL</label>
+          <input id="chat-server-url" type="url" class="field px-3 py-2 text-[12px]" placeholder="https://YOUR-VERCEL-APP.vercel.app" />
+          <p class="text-[11px] text-white/45">예: https://kfc-checklist-api.vercel.app</p>
           <label class="text-[11px] text-white/60">PROMPT</label>
           <select id="chat-prompt" class="field w-full px-3 py-2 text-[12px]"></select>
           <label class="text-[11px] text-white/60">THINKING LEVEL</label>

@@ -17,13 +17,19 @@
 > - `file://`로 열면 설치 안 됩니다 (HTTPS 필요)
 > - 삼성 인터넷은 설치 UI가 다를 수 있어요
 
+## Vercel 백엔드 (Gemini 프록시)
+- Vercel에서 이 레포를 연결해 프로젝트 생성
+- 환경변수 `GEMINI_API_KEY` 등록
+- (선택) 환경변수 `ALLOWED_ORIGINS`에 `https://ggumtak.github.io` 등록
+- 배포 완료 후 Vercel URL 확보 (예: `https://your-app.vercel.app`)
+
 ## 챗봇 사용
 - 우측 하단 `CHAT` 버튼으로 열기
-- `SETTINGS` 탭에서 API 키 입력
+- `SETTINGS` 탭에서 `SERVER URL`에 Vercel URL 입력
 - 프롬프트와 thinking level(LOW/MEDIUM/HIGH) 선택 가능
 - 모델 기본값: `gemini-3-flash-preview`
 
-> API 키는 브라우저 로컬에 저장됩니다. GitHub에 올리지 마세요.
+> API 키는 Vercel 환경변수에만 저장됩니다.
 
 ## 사진 공유 (카톡)
 - 설정 > Photo Share에서 **카메라/갤러리 선택**
