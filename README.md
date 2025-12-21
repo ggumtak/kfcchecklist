@@ -28,6 +28,7 @@
 - `SETTINGS` 탭에서 `SERVER URL`에 Vercel URL 입력
 - 프롬프트와 thinking level(LOW/MEDIUM/HIGH) 선택 가능
 - 모델 기본값: `gemini-3-flash-preview`
+- 히스토리 시간 표시/제목 변경, 마크다운+코드 하이라이트, HTML 미리보기 지원
 
 > API 키는 Vercel 환경변수에만 저장됩니다.
 

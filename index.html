@@ -8,6 +8,7 @@
   <title>REALITY_SYNC_V6 | KFC Checklist</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" />
 </head>
 <body>
   <header class="pt-14 pb-4 px-8 border-b border-white/5 flex justify-between items-end bg-black/50 backdrop-blur-lg">
@@ -188,7 +189,6 @@
           <div class="notice">Gemini 호출은 Vercel 백엔드에서 처리됩니다. 서버 URL을 입력해 주세요.</div>
           <label class="text-[11px] text-white/60">SERVER URL</label>
           <input id="chat-server-url" type="url" class="field px-3 py-2 text-[12px]" placeholder="https://YOUR-VERCEL-APP.vercel.app" />
-          <p class="text-[11px] text-white/45">예: https://kfc-checklist-api.vercel.app</p>
           <label class="text-[11px] text-white/60">PROMPT</label>
           <select id="chat-prompt" class="field w-full px-3 py-2 text-[12px]"></select>
           <label class="text-[11px] text-white/60">THINKING LEVEL</label>
@@ -199,12 +199,32 @@
           </select>
           <label class="text-[11px] text-white/60">MODEL</label>
           <input id="chat-model" class="field px-3 py-2 text-[12px]" placeholder="gemini-3-flash-preview" />
+          <button id="chat-save" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">설정 저장</button>
           <button id="chat-clear" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">현재 대화 초기화</button>
         </div>
       </div>
     </div>
   </div>
 
+  <div id="canvas-overlay" class="canvas-overlay">
+    <div class="canvas-panel">
+      <div class="canvas-header">
+        <div>
+          <p class="text-[9px] mono text-white/30 uppercase tracking-[0.2em]">Gemini Canvas</p>
+          <h3 class="text-sm font-black">HTML 미리보기</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="canvas-open" class="text-[10px] mono text-cyan-200 px-3 py-2 rounded-[calc(var(--radius)+2px)] border border-cyan-300/20">새 탭</button>
+          <button id="canvas-close" class="text-[11px] mono text-white/50">X</button>
+        </div>
+      </div>
+      <iframe id="canvas-frame" class="canvas-frame" sandbox="" referrerpolicy="no-referrer"></iframe>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
   <script type="module" src="assets/js/main.js"></script>
 </body>
 </html>

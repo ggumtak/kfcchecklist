@@ -109,30 +109,47 @@ export default async function handler(req, res) {
   const model = typeof body?.model === "string" && body.model.trim()
     ? body.model.trim()
     : "gemini-3-flash-preview";
+  const useSearch = promptId === "searchmode";
 
   try {
     const promptText = await getPromptText(promptId);
     const ai = new GoogleGenAI({ apiKey });
-    const config = {
+    const baseConfig = {
       thinkingConfig: { thinkingLevel }
     };
-    if (promptText) config.systemInstruction = promptText;
+    if (promptText) baseConfig.systemInstruction = promptText;
 
     const contents = messages.map((msg) => ({
       role: msg.role,
       parts: [{ text: msg.text }]
     }));
 
-    const response = await ai.models.generateContent({
-      model,
-      contents,
-      config
-    });
-
-    res.status(200).json({
-      text: response?.text || "",
-      model: response?.modelVersion || model
-    });
+    const requestOnce = async (config) => ai.models.generateContent({ model, contents, config });
+    try {
+      const config = { ...baseConfig };
+      if (useSearch) config.tools = [{ googleSearch: {} }];
+      const response = await requestOnce(config);
+      res.status(200).json({
+        text: response?.text || "",
+        model: response?.modelVersion || model,
+        searchUsed: useSearch
+      });
+      return;
+    } catch (err) {
+      if (useSearch) {
+        const fallbackConfig = { ...baseConfig };
+        const notice = "\n[System] Google Search 도구를 사용할 수 없어 검색 없이 답변합니다.";
+        fallbackConfig.systemInstruction = `${fallbackConfig.systemInstruction || ""}${notice}`.trim();
+        const response = await requestOnce(fallbackConfig);
+        res.status(200).json({
+          text: `검색 도구 사용 불가. ${response?.text || ""}`.trim(),
+          model: response?.modelVersion || model,
+          searchUsed: false
+        });
+        return;
+      }
+      throw err;
+    }
   } catch (err) {
     console.warn("[api/chat] request failed", err);
     res.status(500).json({ error: "Gemini request failed" });

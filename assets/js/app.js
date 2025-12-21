@@ -224,15 +224,15 @@ function carryRowHTML(item) {
   const value = item.qty === "" || item.qty == null ? "" : String(item.qty);
 
   return `
-    <div class="flex items-center gap-2">
+    <div class="carry-row">
       <input
-        class="field flex-1 px-3 py-3 text-[12px] font-bold"
+        class="field carry-name px-3 py-3 text-[12px] font-bold"
         data-action="carry-name"
         data-carry-id="${item.id}"
         value="${safeName}"
         placeholder="항목명" />
       <input
-        class="field w-20 px-3 py-3 text-[12px] font-black text-cyan-200 mono text-center"
+        class="field carry-qty px-3 py-3 text-[12px] font-black text-cyan-200 mono text-center"
         type="tel" inputmode="numeric" pattern="[0-9]*"
         data-action="carry-qty"
         data-carry-id="${item.id}"
@@ -240,7 +240,7 @@ function carryRowHTML(item) {
         placeholder="${hint}"
         value="${value}" />
       <button
-        class="px-3 py-3 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/40 hover:text-red-400"
+        class="carry-del px-3 py-3 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/40 hover:text-red-400"
         data-action="carry-del"
         data-carry-id="${item.id}"
         aria-label="carry delete">

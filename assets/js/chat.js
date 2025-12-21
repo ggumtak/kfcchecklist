@@ -25,7 +25,14 @@ function normalizeState(raw) {
   const sessions = Array.isArray(safe.sessions) ? safe.sessions.map((s) => ({
     id: s.id || createId("chat"),
     title: String(s.title || "새 대화"),
-    messages: Array.isArray(s.messages) ? s.messages.slice(-MAX_MESSAGES) : [],
+    messages: Array.isArray(s.messages)
+      ? s.messages.slice(-MAX_MESSAGES).map((msg) => ({
+        id: msg?.id || createId("msg"),
+        role: msg?.role === "model" ? "model" : "user",
+        text: typeof msg?.text === "string" ? msg.text : "",
+        ts: msg?.ts || s.updatedAt || Date.now()
+      }))
+      : [],
     createdAt: s.createdAt || Date.now(),
     updatedAt: s.updatedAt || Date.now()
   })) : [];
@@ -70,6 +77,62 @@ function buildEndpoint(rawUrl) {
   return `${trimmed}/api/chat`;
 }
 
+function formatRelativeTime(ts) {
+  const now = Date.now();
+  const diff = Math.max(0, now - ts);
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "방금";
+  if (mins < 60) return `${mins}분 전`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}일 전`;
+  return new Date(ts).toLocaleDateString("ko-KR");
+}
+
+function renderMarkdown(text) {
+  const raw = String(text || "");
+  if (window.marked && window.DOMPurify) {
+    if (!renderMarkdown._configured) {
+      window.marked.setOptions({
+        gfm: true,
+        breaks: true,
+        headerIds: false,
+        mangle: false
+      });
+      renderMarkdown._configured = true;
+    }
+    const parsed = window.marked.parse(raw);
+    return window.DOMPurify.sanitize(parsed, { USE_PROFILES: { html: true } });
+  }
+  return escapeHtml(raw).replace(/\n/g, "<br />");
+}
+
+function applyHighlights(container) {
+  if (!window.hljs || !container) return;
+  container.querySelectorAll("pre code").forEach((block) => {
+    window.hljs.highlightElement(block);
+  });
+}
+
+function extractHtmlBlocks(text) {
+  const blocks = [];
+  const raw = String(text || "");
+  const fence = /```html\s*([\s\S]*?)```/gi;
+  let match;
+  while ((match = fence.exec(raw)) !== null) {
+    const html = match[1].trim();
+    if (html) blocks.push(html);
+  }
+  if (!blocks.length) {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("<!DOCTYPE html") || trimmed.startsWith("<html")) {
+      blocks.push(trimmed);
+    }
+  }
+  return blocks;
+}
+
 export function initChat({ showToast } = {}) {
   const toast = (msg) => (showToast ? showToast(msg) : console.log(msg));
 
@@ -91,10 +154,45 @@ export function initChat({ showToast } = {}) {
   const promptEl = qs("#chat-prompt");
   const thinkingEl = qs("#chat-thinking");
   const modelEl = qs("#chat-model");
+  const saveBtn = qs("#chat-save");
   const clearBtn = qs("#chat-clear");
+
+  const canvasOverlay = qs("#canvas-overlay");
+  const canvasFrame = qs("#canvas-frame");
+  const canvasOpenBtn = qs("#canvas-open");
+  const canvasCloseBtn = qs("#canvas-close");
 
   let state = loadState();
   const scheduleSave = debounce(() => saveState(state), 200);
+  let currentHtml = "";
+
+  const applySettingsFromInputs = () => {
+    if (serverUrlEl) state.settings.serverUrl = serverUrlEl.value.trim();
+    if (promptEl) state.settings.promptId = promptEl.value || "searchmode";
+    if (thinkingEl) state.settings.thinkingLevel = thinkingEl.value || "medium";
+    if (modelEl) state.settings.model = modelEl.value.trim() || "gemini-3-flash-preview";
+  };
+
+  const openCanvas = (html) => {
+    if (!canvasOverlay || !canvasFrame) return;
+    currentHtml = html || "";
+    canvasFrame.srcdoc = currentHtml;
+    canvasOverlay.classList.add("open");
+  };
+
+  const closeCanvas = () => {
+    if (!canvasOverlay || !canvasFrame) return;
+    canvasFrame.srcdoc = "";
+    canvasOverlay.classList.remove("open");
+  };
+
+  const openCanvasTab = () => {
+    if (!currentHtml) return;
+    const blob = new Blob([currentHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener");
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   const ensureSession = () => {
     if (!state.sessions.length) {
@@ -121,10 +219,17 @@ export function initChat({ showToast } = {}) {
     sessionsEl.innerHTML = sorted
       .map((session) => {
         const active = session.id === state.activeSessionId ? "active" : "";
+        const timeLabel = formatRelativeTime(session.updatedAt || session.createdAt || Date.now());
         return `
           <div class="chat-history-item ${active}" data-session-id="${session.id}">
-            <span class="text-[11px] text-white/70">${escapeHtml(session.title || "새 대화")}</span>
-            <button class="text-[10px] text-red-400" data-session-del="${session.id}">DEL</button>
+            <div class="min-w-0">
+              <div class="chat-history-title">${escapeHtml(session.title || "새 대화")}</div>
+              <div class="chat-history-meta">${timeLabel}</div>
+            </div>
+            <div class="chat-history-actions">
+              <button class="chat-history-btn rename" data-session-rename="${session.id}">NAME</button>
+              <button class="chat-history-btn del" data-session-del="${session.id}">DEL</button>
+            </div>
           </div>
         `;
       })
@@ -138,9 +243,20 @@ export function initChat({ showToast } = {}) {
     messagesEl.innerHTML = session.messages
       .map((msg) => {
         const klass = msg.role === "user" ? "user" : "model";
-        return `<div class="chat-msg ${klass}">${escapeHtml(msg.text)}</div>`;
+        const html = renderMarkdown(msg.text);
+        const hasHtml = extractHtmlBlocks(msg.text).length > 0;
+        const htmlBtn = hasHtml
+          ? `<button class="chat-html-btn" data-action="open-html" data-msg-id="${msg.id}">HTML 보기</button>`
+          : "";
+        return `
+          <div class="chat-msg ${klass}" data-msg-id="${msg.id}">
+            <div class="chat-msg-body">${html}</div>
+            ${htmlBtn}
+          </div>
+        `;
       })
       .join("");
+    applyHighlights(messagesEl);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   };
 
@@ -160,6 +276,7 @@ export function initChat({ showToast } = {}) {
   };
 
   const createMessage = (role, text) => ({
+    id: createId("msg"),
     role,
     text,
     ts: Date.now()
@@ -184,6 +301,7 @@ export function initChat({ showToast } = {}) {
   const sendMessage = async () => {
     const text = inputEl?.value?.trim();
     if (!text) return;
+    applySettingsFromInputs();
     const endpoint = buildEndpoint(state.settings.serverUrl || "");
     if (!endpoint) {
       toast("서버 URL을 먼저 입력해줘");
@@ -259,6 +377,20 @@ export function initChat({ showToast } = {}) {
   });
 
   sessionsEl?.addEventListener("click", (e) => {
+    const renameBtn = e.target.closest("[data-session-rename]");
+    if (renameBtn) {
+      const id = renameBtn.dataset.sessionRename;
+      const session = state.sessions.find((s) => s.id === id);
+      if (!session) return;
+      const nextTitle = window.prompt("새 제목", session.title || "새 대화");
+      if (nextTitle && nextTitle.trim()) {
+        session.title = nextTitle.trim();
+        session.updatedAt = Date.now();
+        scheduleSave();
+        renderSessions();
+      }
+      return;
+    }
     const delBtn = e.target.closest("[data-session-del]");
     if (delBtn) {
       const id = delBtn.dataset.sessionDel;
@@ -284,6 +416,23 @@ export function initChat({ showToast } = {}) {
     setTab("chat");
   });
 
+  messagesEl?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action=\"open-html\"]");
+    if (!btn) return;
+    const msgId = btn.dataset.msgId;
+    const session = getActiveSession();
+    const msg = session?.messages.find((m) => m.id === msgId);
+    if (!msg) return;
+    const blocks = extractHtmlBlocks(msg.text);
+    if (blocks.length) openCanvas(blocks[0]);
+  });
+
+  canvasOpenBtn?.addEventListener("click", openCanvasTab);
+  canvasCloseBtn?.addEventListener("click", closeCanvas);
+  canvasOverlay?.addEventListener("click", (e) => {
+    if (e.target === canvasOverlay) closeCanvas();
+  });
+
   serverUrlEl?.addEventListener("change", () => {
     state.settings.serverUrl = serverUrlEl.value.trim();
     scheduleSave();
@@ -299,6 +448,11 @@ export function initChat({ showToast } = {}) {
   modelEl?.addEventListener("change", () => {
     state.settings.model = modelEl.value.trim() || "gemini-3-flash-preview";
     scheduleSave();
+  });
+  saveBtn?.addEventListener("click", () => {
+    applySettingsFromInputs();
+    scheduleSave();
+    toast("설정 저장됨");
   });
 
   clearBtn?.addEventListener("click", () => {
@@ -318,6 +472,10 @@ export function initChat({ showToast } = {}) {
   renderMessages();
   renderSettings();
   setTab("chat");
+
+  setInterval(() => {
+    if (panel?.classList.contains("open")) renderSessions();
+  }, 60000);
 
   return { sendMessage };
 }
