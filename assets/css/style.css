@@ -119,6 +119,19 @@ h1,h2,h3,h4{
   box-shadow:0 0 22px rgba(185,153,122,0.18);
   transform:scale(0.985);
 }
+.category-section.dragging{
+  opacity:0.72;
+}
+.task-card button{
+  min-width:0;
+}
+.task-card [data-edit-input="task"]{
+  width:100%;
+  min-width:0;
+}
+.task-card [data-task-text]{
+  min-width:0;
+}
 .restock-card{
   background:rgba(255,255,255,0.02);
 }
@@ -148,6 +161,19 @@ h1,h2,h3,h4{
   border:1px solid rgba(185,153,122,0.3);
   color:var(--accent-cyan);
   background:transparent;
+}
+.restock-btn.icon-only{
+  width:28px;
+  height:28px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  letter-spacing:0;
+}
+.restock-btn.icon-only svg{
+  width:14px;
+  height:14px;
 }
 .restock-btn.active{
   background:rgba(185,153,122,0.18);
@@ -302,6 +328,23 @@ button:disabled{
   padding-top:14px;
   margin-top:14px;
 }
+.icon-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:6px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.02);
+  cursor:pointer;
+}
+.icon-btn svg{
+  width:16px;
+  height:16px;
+}
+.icon-btn.icon-sm{
+  padding:4px;
+}
 .tab-manager-list{
   display:flex;
   flex-direction:column;
@@ -386,6 +429,10 @@ button:disabled{
   font-size:11px;
   letter-spacing:0.12em;
   box-shadow:0 12px 28px rgba(0,0,0,0.45);
+}
+.chat-toggle svg{
+  width:20px;
+  height:20px;
 }
 
 .focus-exit{

@@ -98,6 +98,72 @@ function mergeDefaultCategories(positions, defaults){
   });
 }
 
+function mergeTasksPreserve(targetCat, sourceCat){
+  if(!targetCat || !sourceCat) return;
+  if(!Array.isArray(targetCat.tasks)) targetCat.tasks = [];
+  const existing = new Map(targetCat.tasks.map((task) => [task.id, task]));
+  sourceCat.tasks.forEach((task) => {
+    const safe = normalizeTask(task);
+    const found = existing.get(safe.id);
+    if(found){
+      found.done = safe.done;
+      found.text = safe.text;
+    }else{
+      targetCat.tasks.push(safe);
+    }
+  });
+}
+
+function migrateKitchenTasksToBack(positions){
+  const kitchen = positions.kitchen;
+  const back = positions.back;
+  if(!kitchen || !back) return;
+  const mapping = {
+    "kitchen-start": "back-start",
+    "kitchen-mid": "back-mid",
+    "kitchen-late": "back-late"
+  };
+  const moved = [];
+  kitchen.categories = Array.isArray(kitchen.categories)
+    ? kitchen.categories.filter((cat) => {
+      const targetId = mapping[cat.id];
+      if(targetId){
+        moved.push({ cat, targetId });
+        return false;
+      }
+      return true;
+    })
+    : [];
+
+  moved.forEach(({ cat, targetId }) => {
+    const target = Array.isArray(back.categories)
+      ? back.categories.find((item) => item.id === targetId)
+      : null;
+    if(target){
+      mergeTasksPreserve(target, cat);
+    }else{
+      back.categories = Array.isArray(back.categories) ? back.categories : [];
+      back.categories.push({
+        id: targetId,
+        name: cat.name,
+        mode: cat.mode || "default",
+        tasks: Array.isArray(cat.tasks) ? cat.tasks.map(normalizeTask) : []
+      });
+    }
+  });
+}
+
+function pruneEmptyPlaceholders(positions){
+  const placeholders = new Set(["kitchen-default", "counter-default", "back-default"]);
+  Object.values(positions).forEach((pos) => {
+    if(!pos || !Array.isArray(pos.categories)) return;
+    pos.categories = pos.categories.filter((cat) => {
+      if(!placeholders.has(cat.id)) return true;
+      return Array.isArray(cat.tasks) && cat.tasks.length > 0;
+    });
+  });
+}
+
 function normalizeCarry(carry){
   if(!Array.isArray(carry)) return DEFAULT_CARRY.map(item => ({ ...item }));
   return carry.map((item) => {
@@ -128,6 +194,8 @@ function normalizeState(raw){
   });
 
   mergeDefaultCategories(positions, defaults);
+  migrateKitchenTasksToBack(positions);
+  pruneEmptyPlaceholders(positions);
 
   const baseOrder = Array.isArray(safe.positionOrder) && safe.positionOrder.length
     ? safe.positionOrder

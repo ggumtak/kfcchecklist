@@ -7,6 +7,7 @@ let state = loadState();
 let toastTimer = null;
 const dragState = {
   active: false,
+  type: "task",
   card: null,
   catId: null,
   pointerId: null,
@@ -395,9 +396,12 @@ function taskCardHTML(task, posId, catId, mode = "default") {
       </button>
 
       <div class="flex items-center gap-2">
-        <button class="text-white/20 hover:text-cyan-200 p-1 transition-colors"
+        <button class="icon-btn icon-sm text-white/30 hover:text-cyan-200"
                 data-action="edit-task" data-task-id="${task.id}" aria-label="edit">
-          EDIT
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+          </svg>
         </button>
         <button class="text-white/10 hover:text-red-500/60 p-1 transition-colors"
                 data-action="delete-task" data-task-id="${task.id}" aria-label="delete">
@@ -429,14 +433,9 @@ function renderCarryPanelHTML() {
 
           <div class="flex items-center gap-2">
             <button
-              class="px-4 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-cyan-200 text-[10px] mono font-bold uppercase tracking-widest active:scale-[0.98] transition"
-              data-action="carry-copy">
-              COPY
-            </button>
-            <button
               class="px-4 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/35 text-[10px] mono uppercase tracking-widest active:scale-[0.98] transition"
-              data-action="carry-add">
-              + ADD
+              data-action="carry-add" aria-label="워크인 항목 추가">
+              +
             </button>
           </div>
         </div>
@@ -483,35 +482,6 @@ function carryRowHTML(item) {
       </button>
     </div>
   `;
-}
-
-function makeCarryText() {
-  const lines = state.carry
-    .filter((item) => safeText(item.name).length > 0)
-    .filter((item) => item.qty !== "" && item.qty != null)
-    .map((item) => `${safeText(item.name)} ${item.qty}개`);
-  return lines.join("\n");
-}
-
-async function copyToClipboard(text) {
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (_) {}
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    ta.remove();
-    return true;
-  } catch (_) {}
-  return false;
 }
 
 function isCollapsed(catId) {
@@ -701,8 +671,9 @@ function clearDragTimer() {
   }
 }
 
-function startDrag(card, catId, pointerId) {
+function startDrag(card, catId, pointerId, type = "task") {
   dragState.active = true;
+  dragState.type = type;
   dragState.card = card;
   dragState.catId = catId;
   dragState.pointerId = pointerId;
@@ -719,15 +690,28 @@ function reorderCategoryFromDOM(catId) {
   category.tasks.sort((a, b) => order.indexOf(String(a.id)) - order.indexOf(String(b.id)));
 }
 
+function reorderCategoriesFromDOM() {
+  const position = state.positions[state.activeTab];
+  const container = mainContent();
+  if (!position || !container) return;
+  const order = Array.from(container.querySelectorAll(".category-section")).map((el) => String(el.dataset.catId));
+  position.categories.sort((a, b) => order.indexOf(String(a.id)) - order.indexOf(String(b.id)));
+}
+
 function endDrag(commit = true) {
   clearDragTimer();
   if (!dragState.active) return;
   if (dragState.card) dragState.card.classList.remove("dragging");
   if (commit) {
-    reorderCategoryFromDOM(dragState.catId);
+    if (dragState.type === "category") {
+      reorderCategoriesFromDOM();
+    } else {
+      reorderCategoryFromDOM(dragState.catId);
+    }
     scheduleSave();
   }
   dragState.active = false;
+  dragState.type = "task";
   dragState.card = null;
   dragState.catId = null;
   dragState.pointerId = null;
@@ -735,10 +719,29 @@ function endDrag(commit = true) {
 }
 
 function handlePointerDown(e) {
-  const card = e.target.closest(".task-card");
-  if (!card || state.activeTab === GUIDE_TAB.id) return;
-  if (e.target.closest("[data-action=\"delete-task\"], [data-action=\"edit-task\"]")) return;
+  if (state.activeTab === GUIDE_TAB.id) return;
   if (e.target.closest("input, textarea, select")) return;
+
+  const header = e.target.closest(".sticky-section-header");
+  if (header) {
+    if (e.target.closest("[data-action]")) return;
+    const section = header.closest("section[data-cat-id]");
+    if (!section) return;
+    dragState.startX = e.clientX;
+    dragState.startY = e.clientY;
+    dragState.card = section;
+    dragState.catId = section.dataset.catId;
+    dragState.pointerId = e.pointerId;
+    clearDragTimer();
+    dragState.longPressTimer = setTimeout(() => {
+      startDrag(section, dragState.catId, e.pointerId, "category");
+    }, DRAG_LONG_PRESS_MS);
+    return;
+  }
+
+  const card = e.target.closest(".task-card");
+  if (!card) return;
+  if (e.target.closest("[data-action=\"delete-task\"], [data-action=\"edit-task\"]")) return;
   dragState.startX = e.clientX;
   dragState.startY = e.clientY;
   dragState.card = card;
@@ -746,7 +749,7 @@ function handlePointerDown(e) {
   dragState.pointerId = e.pointerId;
   clearDragTimer();
   dragState.longPressTimer = setTimeout(() => {
-    startDrag(card, dragState.catId, e.pointerId);
+    startDrag(card, dragState.catId, e.pointerId, "task");
   }, DRAG_LONG_PRESS_MS);
 }
 
@@ -761,10 +764,27 @@ function handlePointerMove(e) {
 
   if (!dragState.active || dragState.pointerId !== e.pointerId) return;
 
+  e.preventDefault();
+
+  if (dragState.type === "category") {
+    const container = mainContent();
+    if (!container || !dragState.card) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const target = el?.closest(".category-section");
+    if (!target || target === dragState.card) return;
+    const rect = target.getBoundingClientRect();
+    const before = e.clientY < rect.top + rect.height / 2;
+    if (before) {
+      container.insertBefore(dragState.card, target);
+    } else {
+      container.insertBefore(dragState.card, target.nextSibling);
+    }
+    return;
+  }
+
   const list = qs(`#list-${dragState.catId}`);
   if (!list || !dragState.card) return;
 
-  e.preventDefault();
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const target = el?.closest(".task-card");
   if (!target || target === dragState.card) return;
@@ -793,7 +813,7 @@ function renderCategories(position) {
 
   position.categories.forEach((cat) => {
     const section = document.createElement("section");
-    section.className = "space-y-3 fade-in";
+    section.className = "space-y-3 fade-in category-section";
     section.dataset.catId = cat.id;
 
     const collapsed = isCollapsed(cat.id);
@@ -808,9 +828,12 @@ function renderCategories(position) {
             NEED ONLY
           </button>
           <button
-            class="restock-btn reset"
+            class="restock-btn reset icon-only"
             data-action="reset-restock" data-cat-id="${cat.id}" aria-label="restock reset">
-            RESET
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 101.8-5.4" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 4v5h5" />
+            </svg>
           </button>
         `
       : "";
@@ -832,8 +855,13 @@ function renderCategories(position) {
           <span class="text-[10px] mono text-white/20" id="cat-count-${cat.id}">0/0</span>
           ${restockControls}
           <button
-            class="p-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/60"
-            data-action="edit-category" data-cat-id="${cat.id}" aria-label="edit category">EDIT</button>
+            class="icon-btn icon-sm text-white/35 hover:text-cyan-200"
+            data-action="edit-category" data-cat-id="${cat.id}" aria-label="edit category">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+          </button>
           <button
             class="p-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/60 active:scale-[0.98] transition"
             data-action="toggle-section" data-cat-id="${cat.id}" aria-label="toggle section">
@@ -851,9 +879,9 @@ function renderCategories(position) {
         </div>
 
         <div id="add-box-${cat.id}" class="pt-2 px-1">
-          <button data-action="open-add-task" data-cat-id="${cat.id}"
+          <button data-action="open-add-task" data-cat-id="${cat.id}" aria-label="항목 추가"
             class="w-full py-4 rounded-[calc(var(--radius)+4px)] border border-white/5 bg-white/[0.02] text-[10px] mono text-white/30 uppercase tracking-widest active:scale-[0.99] transition">
-            + ADD_TASK_ITEM
+            +
           </button>
         </div>
       </div>
@@ -866,9 +894,9 @@ function renderCategories(position) {
   addCategory.className = "space-y-3 fade-in";
   addCategory.innerHTML = `
     <div id="add-category-box" class="pt-2 px-1">
-      <button data-action="open-add-category"
+      <button data-action="open-add-category" aria-label="카테고리 추가"
         class="w-full py-4 rounded-[calc(var(--radius)+4px)] border border-white/5 bg-white/[0.02] text-[10px] mono text-white/30 uppercase tracking-widest active:scale-[0.99] transition">
-        + ADD_CATEGORY
+        +
       </button>
     </div>
   `;
@@ -1060,9 +1088,9 @@ function cancelAddCategory() {
   const box = qs("#add-category-box");
   if (!box) return;
   box.innerHTML = `
-    <button data-action="open-add-category"
+    <button data-action="open-add-category" aria-label="카테고리 추가"
       class="w-full py-4 rounded-[calc(var(--radius)+4px)] border border-white/5 bg-white/[0.02] text-[10px] mono text-white/30 uppercase tracking-widest active:scale-[0.99] transition">
-      + ADD_CATEGORY
+      +
     </button>
   `;
 }
@@ -1809,18 +1837,6 @@ function initEventHandlers() {
       return;
     }
 
-    if (action === "carry-copy") {
-      const text = makeCarryText();
-      if (!text) {
-        showToast("복사할 수량이 없어 (수량 입력해줘)");
-        safeVibrate(20);
-        return;
-      }
-      copyToClipboard(text).then((ok) => {
-        showToast(ok ? "워크인 목록 복사 완료" : "복사 실패: 수동으로 복사해줘");
-        safeVibrate([15, 30, 15]);
-      });
-    }
   });
 
   content?.addEventListener("input", (e) => {

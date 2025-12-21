@@ -7,7 +7,7 @@ export const GUIDE_TAB = { id: "guide", name: "외국인 응대" };
 
 const DEFAULT_POSITION_ORDER = ["back", "kitchen", "counter"];
 
-const kitchenStartTasks = [
+const backStartTasks = [
   { id: "ks-1", text: "해동표찰" },
   { id: "ks-2", text: "해동표찰 사진찍기" },
   { id: "ks-3", text: "베이컨 오븐판" },
@@ -16,7 +16,7 @@ const kitchenStartTasks = [
   { id: "ks-6", text: "감자 담는 판 아래 큰 철판" }
 ];
 
-const kitchenMidTasks = [
+const backMidTasks = [
   { id: "km-1", text: "오븐 판 1개" },
   { id: "km-2", text: "양념 통들 넣고 빼는 판" },
   { id: "km-3", text: "집게 거치대2개+집게 1개" },
@@ -24,7 +24,7 @@ const kitchenMidTasks = [
   { id: "km-5", text: "사이드 주는 판 빼기" }
 ];
 
-const kitchenLateTasks = [
+const backLateTasks = [
   { id: "kl-1", text: "빵 굽기판" },
   { id: "kl-2", text: "빵 조리판" },
   { id: "kl-3", text: "양념, 트리플 치르르 통" },
@@ -72,24 +72,22 @@ export function createDefaultState(){
       kitchen: {
         id: "kitchen",
         name: "주방",
-        categories: [
-          { id: "kitchen-default", name: "주방 업무", tasks: [] }
-        ]
+        categories: []
       },
       back: {
         id: "back",
         name: "백",
         categories: [
           { id: "back-restock", name: "자재 보충 (수시)", mode: "restock", tasks: backRestockTasks.map(t => ({ ...t, done: false })) },
-          { id: "back-default", name: "백 마감", tasks: [] }
+          { id: "back-start", name: "마감 시작", tasks: backStartTasks.map(t => ({ ...t, done: false })) },
+          { id: "back-mid", name: "중간 마감", tasks: backMidTasks.map(t => ({ ...t, done: false })) },
+          { id: "back-late", name: "9시 반 마감", tasks: backLateTasks.map(t => ({ ...t, done: false })) }
         ]
       },
       counter: {
         id: "counter",
         name: "카운터",
-        categories: [
-          { id: "counter-default", name: "카운터 업무", tasks: [] }
-        ]
+        categories: []
       }
     },
     carry: DEFAULT_CARRY.map(item => ({ ...item })),
