@@ -13,6 +13,7 @@ const DEFAULT_PROMPT_ID = "searchmode";
 const ALLOWED_THINKING = new Set(["low", "medium", "high"]);
 const MAX_MESSAGES = 40;
 const promptCache = new Map();
+const ONLINE_THRESHOLD = new Date("2025-11-23T00:00:00+09:00");
 
 function getAllowedOrigins() {
   const raw = process.env.ALLOWED_ORIGINS;
@@ -112,6 +113,10 @@ export default async function handler(req, res) {
     ? body.model.trim()
     : "gemini-3-flash-preview";
   const useSearchTool = body?.useSearchTool !== false;
+  const now = new Date();
+  const onlineMode = now >= ONLINE_THRESHOLD;
+  const nowIso = now.toISOString();
+  const nowKst = now.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 
   try {
     const promptText = await getPromptText(promptId);
@@ -122,7 +127,18 @@ export default async function handler(req, res) {
     const baseConfig = {
       thinkingConfig: { thinkingLevel }
     };
-    if (promptText) baseConfig.systemInstruction = promptText;
+    const runtimeBanner = [
+      "[RUNTIME STATUS]",
+      `SERVER_TIME_ISO=${nowIso}`,
+      `SERVER_TIME_KST=${nowKst}`,
+      `ONLINE_MODE=${onlineMode ? "true" : "false"}`,
+      `SEARCH_TOOL_ENABLED=${useSearchTool ? "true" : "false"}`
+    ].join("\n");
+    if (promptText) {
+      baseConfig.systemInstruction = `${runtimeBanner}\n\n${promptText}`;
+    } else {
+      baseConfig.systemInstruction = runtimeBanner;
+    }
     if (useSearchTool) baseConfig.tools = [{ type: "google_search" }];
 
     const contents = messages.map((msg) => ({
@@ -160,7 +176,9 @@ export default async function handler(req, res) {
         promptChars: promptText.length,
         thinkingLevel,
         searchEnabled: useSearchTool,
-        searchFallback
+        searchFallback,
+        onlineMode,
+        serverTime: nowIso
       }
     });
   } catch (err) {
