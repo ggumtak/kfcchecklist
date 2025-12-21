@@ -1,25 +1,25 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;600;700;900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=JetBrains+Mono:wght@400;700&family=Noto+Serif+KR:wght@400;600&display=swap');
 
 :root{
-  --bg-dark:#050608;
-  --panel-bg:#0f1218;
-  --accent-blue:#3b82f6;
-  --accent-cyan:#22d3ee;
-  --border-color:#1e2229;
+  --bg-dark:#121212;
+  --panel-bg:#1e1e1e;
+  --accent-blue:#d4b28c;
+  --accent-cyan:#b99c7a;
+  --border-color:#333;
   --radius:14px;
-  --shadow-glow:0 0 18px rgba(34,211,238,0.18), 0 0 40px rgba(59,130,246,0.12);
+  --shadow-glow:0 0 18px rgba(212,178,140,0.18), 0 0 40px rgba(185,153,122,0.12);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --code-bg:#0a0f16;
-  --code-border:#1b2433;
-  --code-inline-bg:rgba(255,255,255,0.08);
+  --code-bg:#2a2a2a;
+  --code-border:#333;
+  --code-inline-bg:#2c2c2c;
 }
 
 *{ box-sizing:border-box; }
 
 body{
-  font-family:'Noto Sans KR',sans-serif;
+  font-family:'Gowun Batang',serif;
   background:var(--bg-dark);
-  color:#fff;
+  color:#e0e0e0;
   margin:0;
   min-height:100dvh;
   height:100dvh;
@@ -31,6 +31,10 @@ body{
 }
 
 .mono{ font-family:'JetBrains Mono',monospace; }
+
+h1,h2,h3,h4{
+  font-family:'Noto Serif KR',serif;
+}
 
 .square-card{
   background:var(--panel-bg);
@@ -538,3 +542,5 @@ button:disabled{
   .chat-panel{ right:10px; left:10px; width:auto; }
   .chat-toggle{ right:12px; }
 }
+
+

@@ -1,8 +1,7 @@
-﻿const CACHE_NAME = "kfc-checklist-v9";
+﻿const CACHE_NAME = "kfc-checklist-v10";
 const ASSETS = [
   "./",
   "./index.html",
-  "./2.html",
   "./manifest.json",
   "./assets/css/style.css",
   "./assets/js/app.js",
