@@ -113,6 +113,8 @@ export default async function handler(req, res) {
     ? body.model.trim()
     : "gemini-3-flash-preview";
   const useSearchTool = body?.useSearchTool !== false;
+  const screenContext = typeof body?.screenContext === "string" ? body.screenContext.trim() : "";
+  const screenSnippet = screenContext ? screenContext.slice(0, 6000) : "";
   const now = new Date();
   const onlineMode = now >= ONLINE_THRESHOLD;
   const nowIso = now.toISOString();
@@ -134,10 +136,11 @@ export default async function handler(req, res) {
       `ONLINE_MODE=${onlineMode ? "true" : "false"}`,
       `SEARCH_TOOL_ENABLED=${useSearchTool ? "true" : "false"}`
     ].join("\n");
+    const screenBlock = screenSnippet ? `\n\n[SCREEN_CONTEXT]\n${screenSnippet}` : "";
     if (promptText) {
-      baseConfig.systemInstruction = `${runtimeBanner}\n\n${promptText}`;
+      baseConfig.systemInstruction = `${runtimeBanner}${screenBlock}\n\n${promptText}`;
     } else {
-      baseConfig.systemInstruction = runtimeBanner;
+      baseConfig.systemInstruction = `${runtimeBanner}${screenBlock}`;
     }
     if (useSearchTool) baseConfig.tools = [{ type: "google_search" }];
 

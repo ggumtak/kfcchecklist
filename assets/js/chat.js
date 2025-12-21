@@ -133,6 +133,92 @@ function extractHtmlBlocks(text) {
   return blocks;
 }
 
+function buildScreenContext() {
+  const lines = [];
+  const activeTabBtn = document.querySelector("#position-tabs .tab-btn.active");
+  const activeTabId = activeTabBtn?.dataset.tabId || "";
+  const activeTabName = activeTabBtn?.textContent?.trim() || "";
+  const tabNames = Array.from(document.querySelectorAll("#position-tabs .tab-btn"))
+    .map((btn) => {
+      const id = btn.dataset.tabId || "";
+      const name = btn.textContent?.trim() || "";
+      return id && name ? `${id}(${name})` : name || id;
+    })
+    .filter(Boolean);
+
+  const percent = document.querySelector("#progress-percent")?.textContent?.trim() || "";
+  const count = document.querySelector("#task-count")?.textContent?.trim() || "";
+
+  lines.push("ACTIVE_TAB=" + (activeTabId || "unknown") + (activeTabName ? ` (${activeTabName})` : ""));
+  if (tabNames.length) lines.push("TABS=" + tabNames.join(", "));
+  if (percent || count) lines.push(`PROGRESS=${percent || "0%"} ${count || ""}`.trim());
+
+  const main = document.querySelector("#main-content");
+  const sections = main ? Array.from(main.querySelectorAll("section.category-section")) : [];
+  if (!sections.length) {
+    lines.push("CHECKLIST=NONE_VISIBLE");
+    return lines.join("\n");
+  }
+
+  lines.push(`SECTIONS=${sections.length}`);
+  sections.forEach((section) => {
+    const catId = section.dataset.catId || "";
+    const titleEl = section.querySelector("[data-cat-title]");
+    const editTitleInput = section.querySelector(".sticky-section-header input");
+    const title = titleEl?.textContent?.trim() || editTitleInput?.value?.trim() || "카테고리";
+    const body = section.querySelector(`#sec-body-${catId}`) || section.querySelector("[id^='sec-body-']");
+    const collapsed = body?.classList.contains("hidden");
+    const tasks = Array.from((body || section).querySelectorAll(".task-card"));
+    const doneCount = tasks.filter((task) =>
+      task.querySelector(".check-box")?.classList.contains("checked")
+    ).length;
+    const total = tasks.length;
+    const isRestock = !!section.querySelector(".restock-tag");
+
+    lines.push(`SECTION=${title}${isRestock ? " [restock]" : ""}${collapsed ? " (collapsed)" : ""} (${doneCount}/${total})`);
+
+    tasks.forEach((task) => {
+      const textEl = task.querySelector("[data-task-text]");
+      const editInput = task.querySelector("input[data-edit-input='task']");
+      const text = textEl?.textContent?.trim() || editInput?.value?.trim() || "";
+      if (!text) return;
+      const checked = task.querySelector(".check-box")?.classList.contains("checked");
+      lines.push(` - ${checked ? "[x]" : "[ ]"} ${text}`);
+    });
+  });
+
+  const carryRows = Array.from(document.querySelectorAll("#carry-list .carry-row"));
+  if (carryRows.length) {
+    lines.push("CARRY=");
+    carryRows.forEach((row) => {
+      const name = row.querySelector(".carry-name")?.value?.trim() || "항목";
+      const qtyInput = row.querySelector(".carry-qty");
+      const qty = qtyInput?.value?.trim() || "";
+      const hint = qtyInput?.placeholder?.trim() || qtyInput?.dataset?.hint || "";
+      const qtyLabel = qty ? qty : (hint ? `hint:${hint}` : "");
+      lines.push(` * ${name}${qtyLabel ? `=${qtyLabel}` : ""}`);
+    });
+  }
+
+  const restockPanel = document.querySelector("#restock-panel.open");
+  if (restockPanel) {
+    const restockTasks = Array.from(restockPanel.querySelectorAll(".task-card"));
+    lines.push(`RESTOCK_PANEL_OPEN=true (${restockTasks.length})`);
+    restockTasks.forEach((task) => {
+      const text = task.querySelector("[data-task-text]")?.textContent?.trim() || "";
+      if (!text) return;
+      const checked = task.querySelector(".check-box")?.classList.contains("checked");
+      lines.push(` - ${checked ? "[x]" : "[ ]"} ${text}`);
+    });
+  }
+
+  const text = lines.join("\n");
+  if (text.length > 6000) {
+    return `${text.slice(0, 6000)}\n...(truncated)`;
+  }
+  return text;
+}
+
 export function initChat({ showToast } = {}) {
   const toast = (msg) => (showToast ? showToast(msg) : console.log(msg));
 
@@ -337,6 +423,7 @@ export function initChat({ showToast } = {}) {
         thinkingLevel: state.settings.thinkingLevel || "medium",
         model: state.settings.model || "gemini-3-flash-preview",
         useSearchTool: true,
+        screenContext: buildScreenContext(),
         messages: session.messages
           .filter((msg) => msg.text !== thinkingMsg)
           .map((msg) => ({ role: msg.role, text: msg.text }))
