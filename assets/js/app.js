@@ -68,6 +68,14 @@ function safeText(str) {
   return String(str || "").trim();
 }
 
+function isCarryAnchorTask(task) {
+  return task?.id === "ks-1";
+}
+
+function shouldShowCarryInline(position, category) {
+  return position?.id === "back" && category?.id === "back-start" && state.preferences?.showCarry !== false;
+}
+
 function loadChatSettings() {
   try {
     const raw = localStorage.getItem(CHAT_STORAGE_KEY);
@@ -377,12 +385,24 @@ function renderTabs() {
   tabs.innerHTML = html;
 }
 
-function taskCardHTML(task, posId, catId, mode = "default") {
+function taskCardHTML(task, posId, catId, mode = "default", options = {}) {
   const doneClass = getTaskCardClass(task, mode);
   const textClass = getTaskTextClass(task, mode);
   const check = getTaskCheckMarkup(task, mode);
   const checkClass = `check-box ${task.done ? "checked" : ""} ${mode === "restock" ? "restock" : ""}`;
   const modeClass = mode === "restock" ? "restock-card" : "";
+  const showCarryToggle = !!options.showCarryToggle;
+  const carryOpen = !!options.carryOpen;
+  const carryBtn = showCarryToggle
+    ? `
+        <button class="icon-btn icon-sm text-white/35 hover:text-cyan-200 carry-toggle ${carryOpen ? "open" : ""}"
+                data-action="toggle-carry-panel" aria-label="해동표찰 수량">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      `
+    : "";
 
   return `
     <div class="square-card task-card p-3 flex items-center justify-between transition-all ${doneClass} ${modeClass}"
@@ -396,6 +416,7 @@ function taskCardHTML(task, posId, catId, mode = "default") {
       </button>
 
       <div class="flex items-center gap-2">
+        ${carryBtn}
         <button class="icon-btn icon-sm text-white/30 hover:text-cyan-200"
                 data-action="edit-task" data-task-id="${task.id}" aria-label="edit">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -415,19 +436,39 @@ function taskCardHTML(task, posId, catId, mode = "default") {
   `;
 }
 
-function renderCarryPanelHTML() {
+function renderTaskListHTML(position, category, tasks) {
+  const list = [];
+  const showCarry = shouldShowCarryInline(position, category);
+  const carryOpen = !!state.ui?.carryOpen;
+
+  tasks.forEach((task) => {
+    const isCarryAnchor = showCarry && isCarryAnchorTask(task);
+    list.push(taskCardHTML(task, position.id, category.id, category.mode, {
+      showCarryToggle: isCarryAnchor,
+      carryOpen
+    }));
+    if (isCarryAnchor) {
+      list.push(renderCarryInlineHTML());
+    }
+  });
+
+  return list.join("");
+}
+
+function renderCarryInlineHTML() {
   const rows = state.carry.map(carryRowHTML).join("");
+  const open = !!state.ui?.carryOpen;
   return `
-    <section class="space-y-3 fade-in">
+    <div class="carry-inline ${open ? "open" : "closed"}">
       <div class="square-card p-4">
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="flex items-center gap-2">
               <div class="w-1.5 h-4 bg-cyan-300"></div>
-              <h2 class="text-sm font-black uppercase tracking-tight">냉동 워크인 준비</h2>
+              <h3 class="text-sm font-black uppercase tracking-tight">해동표찰 수량</h3>
             </div>
             <p class="text-[10px] mono text-white/25 uppercase tracking-[0.25em] mt-2">
-              TAKE LIST / BEFORE WALK-IN
+              WALK-IN PREP
             </p>
           </div>
 
@@ -445,10 +486,10 @@ function renderCarryPanelHTML() {
         </div>
 
         <div class="mt-3 text-[10px] mono text-white/25">
-          TIP: 수량칸은 비워두고, 필요한 개수만 입력 → COPY. (회색 숫자는 기준 힌트)
+          TIP: 수량칸은 비워두고, 필요한 개수만 입력. (회색 숫자는 기준 힌트)
         </div>
       </div>
-    </section>
+    </div>
   `;
 }
 
@@ -515,6 +556,19 @@ function toggleRestockFilter(catId) {
   safeVibrate(10);
 }
 
+function toggleCarryPanel(force) {
+  if (!state.ui) state.ui = {};
+  if (typeof force === "boolean") {
+    state.ui.carryOpen = force;
+  } else {
+    state.ui.carryOpen = !state.ui.carryOpen;
+  }
+  scheduleSave();
+  renderActiveTab();
+  refreshProgressUI();
+  safeVibrate(10);
+}
+
 function resetRestockCategory(catId) {
   const position = state.positions[state.activeTab];
   const category = position?.categories.find((cat) => cat.id === catId);
@@ -527,6 +581,78 @@ function resetRestockCategory(catId) {
   refreshProgressUI();
   showToast("보충 목록 초기화");
   safeVibrate([15, 30, 15]);
+}
+
+function getRestockCategory() {
+  const position = state.positions[state.activeTab];
+  if (!position) return null;
+  return position.categories.find((cat) => isRestockCategory(cat)) || null;
+}
+
+function applyRestockVisibility() {
+  const toggle = qs("#restock-toggle");
+  const panel = qs("#restock-panel");
+  const onBack = state.activeTab === "back";
+  if (toggle) toggle.classList.toggle("hidden", !onBack);
+  if (!panel) return;
+  if (!onBack) {
+    panel.classList.remove("open");
+    if (state.ui) state.ui.restockOpen = false;
+    return;
+  }
+  panel.classList.toggle("open", !!state.ui?.restockOpen);
+}
+
+function toggleRestockPanel(force) {
+  if (!state.ui) state.ui = {};
+  if (typeof force === "boolean") {
+    state.ui.restockOpen = force;
+  } else {
+    state.ui.restockOpen = !state.ui.restockOpen;
+  }
+  scheduleSave();
+  applyRestockVisibility();
+  if (state.ui.restockOpen) renderRestockPanel();
+}
+
+function renderRestockPanel() {
+  const panel = qs("#restock-panel");
+  const list = qs("#restock-list");
+  const countEl = qs("#restock-count");
+  const filterBtn = qs("#restock-filter");
+  const resetBtn = qs("#restock-reset");
+  if (!panel || !list) return;
+
+  if (state.activeTab !== "back") {
+    panel.classList.remove("open");
+    list.innerHTML = "";
+    if (filterBtn) filterBtn.dataset.catId = "";
+    if (resetBtn) resetBtn.dataset.catId = "";
+    return;
+  }
+
+  const category = getRestockCategory();
+  if (!category) {
+    list.innerHTML = "";
+    if (filterBtn) filterBtn.dataset.catId = "";
+    if (resetBtn) resetBtn.dataset.catId = "";
+    return;
+  }
+
+  const filterOn = isRestockFilterOn(category.id);
+  const visibleTasks = filterOn ? category.tasks.filter((task) => task.done) : category.tasks;
+  list.innerHTML = renderTaskListHTML(state.positions[state.activeTab], category, visibleTasks);
+  if (countEl) {
+    const done = category.tasks.reduce((sum, task) => sum + (task.done ? 1 : 0), 0);
+    countEl.textContent = `${done}/${category.tasks.length}`;
+  }
+  if (filterBtn) {
+    filterBtn.classList.toggle("active", filterOn);
+    filterBtn.dataset.catId = category.id;
+  }
+  if (resetBtn) {
+    resetBtn.dataset.catId = category.id;
+  }
 }
 
 function applyFocusMode() {
@@ -678,6 +804,12 @@ function startDrag(card, catId, pointerId, type = "task") {
   dragState.catId = catId;
   dragState.pointerId = pointerId;
   card.classList.add("dragging");
+  document.body.classList.add("dragging-body");
+  if (card.setPointerCapture) {
+    try {
+      card.setPointerCapture(pointerId);
+    } catch (_) {}
+  }
   safeVibrate(10);
 }
 
@@ -702,6 +834,12 @@ function endDrag(commit = true) {
   clearDragTimer();
   if (!dragState.active) return;
   if (dragState.card) dragState.card.classList.remove("dragging");
+  if (dragState.card && dragState.card.releasePointerCapture) {
+    try {
+      dragState.card.releasePointerCapture(dragState.pointerId);
+    } catch (_) {}
+  }
+  document.body.classList.remove("dragging-body");
   if (commit) {
     if (dragState.type === "category") {
       reorderCategoriesFromDOM();
@@ -741,7 +879,7 @@ function handlePointerDown(e) {
 
   const card = e.target.closest(".task-card");
   if (!card) return;
-  if (e.target.closest("[data-action=\"delete-task\"], [data-action=\"edit-task\"]")) return;
+  if (e.target.closest("[data-action=\"delete-task\"], [data-action=\"edit-task\"], [data-action=\"toggle-carry-panel\"]")) return;
   dragState.startX = e.clientX;
   dragState.startY = e.clientY;
   dragState.card = card;
@@ -810,8 +948,9 @@ function handlePointerUp(e) {
 
 function renderCategories(position) {
   const frag = document.createDocumentFragment();
+  const categories = position.categories.filter((cat) => !isRestockCategory(cat));
 
-  position.categories.forEach((cat) => {
+  categories.forEach((cat) => {
     const section = document.createElement("section");
     section.className = "space-y-3 fade-in category-section";
     section.dataset.catId = cat.id;
@@ -863,6 +1002,15 @@ function renderCategories(position) {
             </svg>
           </button>
           <button
+            class="icon-btn icon-sm text-white/25 hover:text-red-400"
+            data-action="delete-category" data-cat-id="${cat.id}" aria-label="delete category">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 6V4h8v2" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l1 14h10l1-14" />
+            </svg>
+          </button>
+          <button
             class="p-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/60 active:scale-[0.98] transition"
             data-action="toggle-section" data-cat-id="${cat.id}" aria-label="toggle section">
             <svg id="chev-${cat.id}" class="chev ${collapsed ? "" : "open"} w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -875,7 +1023,7 @@ function renderCategories(position) {
       <div id="sec-body-${cat.id}" class="${collapsed ? "hidden" : ""} space-y-2">
         ${restockHint}
         <div class="grid gap-2" id="list-${cat.id}">
-          ${visibleTasks.map((task) => taskCardHTML(task, position.id, cat.id, cat.mode)).join("")}
+          ${renderTaskListHTML(position, cat, visibleTasks)}
         </div>
 
         <div id="add-box-${cat.id}" class="pt-2 px-1">
@@ -914,6 +1062,7 @@ function renderActiveTab() {
 
   if (state.activeTab === GUIDE_TAB.id) {
     container.innerHTML = getGuideHTML();
+    applyRestockVisibility();
     return;
   }
 
@@ -923,14 +1072,12 @@ function renderActiveTab() {
     return;
   }
 
-  if (state.preferences?.showCarry) {
-    container.insertAdjacentHTML("beforeend", renderCarryPanelHTML());
-  }
-
   const frag = renderCategories(position);
   container.appendChild(frag);
 
   position.categories.forEach((cat) => updateSectionCounts(position.id, cat.id));
+  renderRestockPanel();
+  applyRestockVisibility();
 }
 
 function updateSectionCounts(posId, catId) {
@@ -1014,15 +1161,23 @@ function openAddTaskInput(catId) {
     if (e.key === "Enter") confirmAddTask(catId);
     if (e.key === "Escape") cancelAddTask(catId);
   });
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (safeText(input.value)) return;
+      const boxEl = qs(`#add-box-${catId}`);
+      if (boxEl && boxEl.contains(document.activeElement)) return;
+      cancelAddTask(catId);
+    }, 0);
+  });
 }
 
 function cancelAddTask(catId) {
   const box = qs(`#add-box-${catId}`);
   if (!box) return;
   box.innerHTML = `
-    <button data-action="open-add-task" data-cat-id="${catId}"
+    <button data-action="open-add-task" data-cat-id="${catId}" aria-label="항목 추가"
       class="w-full py-4 rounded-[calc(var(--radius)+4px)] border border-white/5 bg-white/[0.02] text-[10px] mono text-white/30 uppercase tracking-widest active:scale-[0.99] transition">
-      + ADD_TASK_ITEM
+      +
     </button>
   `;
 }
@@ -1080,6 +1235,14 @@ function openAddCategory() {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") confirmAddCategory();
       if (e.key === "Escape") cancelAddCategory();
+    });
+    input.addEventListener("blur", () => {
+      setTimeout(() => {
+        if (safeText(input.value)) return;
+        const boxEl = qs("#add-category-box");
+        if (boxEl && boxEl.contains(document.activeElement)) return;
+        cancelAddCategory();
+      }, 0);
     });
   }
 }
@@ -1686,6 +1849,139 @@ function initSettings() {
   initMediaShare();
 }
 
+function handleActionClick(target) {
+  if (!target) return;
+  if (Date.now() < dragState.suppressClickUntil) return;
+  const action = target.dataset.action;
+
+  if (action === "toggle-section") {
+    toggleSection(target.dataset.catId);
+    return;
+  }
+
+  if (action === "toggle-restock-filter") {
+    toggleRestockFilter(target.dataset.catId);
+    return;
+  }
+
+  if (action === "reset-restock") {
+    resetRestockCategory(target.dataset.catId);
+    return;
+  }
+
+  if (action === "toggle-carry-panel") {
+    toggleCarryPanel();
+    return;
+  }
+
+  if (action === "open-add-task") {
+    openAddTaskInput(target.dataset.catId);
+    safeVibrate(10);
+    return;
+  }
+
+  if (action === "cancel-add-task") {
+    cancelAddTask(target.dataset.catId);
+    safeVibrate(10);
+    return;
+  }
+
+  if (action === "confirm-add-task") {
+    confirmAddTask(target.dataset.catId);
+    return;
+  }
+
+  if (action === "open-add-category") {
+    openAddCategory();
+    safeVibrate(10);
+    return;
+  }
+
+  if (action === "cancel-add-category") {
+    cancelAddCategory();
+    safeVibrate(10);
+    return;
+  }
+
+  if (action === "confirm-add-category") {
+    confirmAddCategory();
+    return;
+  }
+
+  if (action === "edit-task") {
+    enterEditTask(target.dataset.taskId);
+    return;
+  }
+
+  if (action === "edit-category") {
+    enterEditCategory(target.dataset.catId);
+    return;
+  }
+
+  if (action === "delete-category") {
+    deleteCategory(target.dataset.catId);
+    return;
+  }
+
+  if (action === "toggle-task") {
+    const taskId = target.dataset.taskId;
+    const card = qs(`[data-task-id="${taskId}"]`);
+    const catId = card?.dataset.catId;
+    const position = state.positions[state.activeTab];
+    const category = position?.categories.find((c) => c.id === catId);
+    const task = category?.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    task.done = !task.done;
+    scheduleSave();
+    const restock = isRestockCategory(category);
+    let rerender = false;
+    if (restock && isRestockFilterOn(catId)) {
+      rerender = true;
+    }
+    if (category && shouldShowCarryInline(position, category) && isCarryAnchorTask(task)) {
+      if (!state.ui.carryOpen) {
+        state.ui.carryOpen = true;
+        rerender = true;
+      }
+    }
+    if (rerender) {
+      renderActiveTab();
+      refreshProgressUI();
+    } else {
+      updateTaskDOM(taskId, catId);
+      updateSectionCounts(position.id, catId);
+      refreshProgressUI();
+      if (restock) {
+        renderRestockPanel();
+      }
+    }
+    safeVibrate(12);
+    return;
+  }
+
+  if (action === "delete-task") {
+    deleteTask(target.dataset.taskId);
+    return;
+  }
+
+  if (action === "carry-add") {
+    state.carry.push({ id: createId("carry"), name: "항목", qty: "", hint: "" });
+    scheduleSave();
+    renderActiveTab();
+    safeVibrate(10);
+    return;
+  }
+
+  if (action === "carry-del") {
+    const id = target.dataset.carryId;
+    state.carry = state.carry.filter((item) => item.id !== id);
+    scheduleSave();
+    renderActiveTab();
+    safeVibrate([25, 40, 25]);
+    return;
+  }
+}
+
 function initEventHandlers() {
   qs("#toast-undo")?.addEventListener("click", undoDelete);
   qs("#toast-close")?.addEventListener("click", () => {
@@ -1716,8 +2012,8 @@ function initEventHandlers() {
   });
 
   const content = mainContent();
-  content?.addEventListener("pointerdown", handlePointerDown);
-  content?.addEventListener("pointermove", handlePointerMove);
+  content?.addEventListener("pointerdown", handlePointerDown, { passive: false });
+  content?.addEventListener("pointermove", handlePointerMove, { passive: false });
   content?.addEventListener("pointerup", handlePointerUp);
   content?.addEventListener("pointercancel", handlePointerUp);
   window.addEventListener("pointerup", handlePointerUp);
@@ -1725,119 +2021,22 @@ function initEventHandlers() {
   content?.addEventListener("click", (e) => {
     const target = e.target.closest("[data-action]");
     if (!target) return;
-    if (Date.now() < dragState.suppressClickUntil) return;
-    const action = target.dataset.action;
-
-    if (action === "toggle-section") {
-      toggleSection(target.dataset.catId);
-      return;
-    }
-
-    if (action === "toggle-restock-filter") {
-      toggleRestockFilter(target.dataset.catId);
-      return;
-    }
-
-    if (action === "reset-restock") {
-      resetRestockCategory(target.dataset.catId);
-      return;
-    }
-
-    if (action === "open-add-task") {
-      openAddTaskInput(target.dataset.catId);
-      safeVibrate(10);
-      return;
-    }
-
-    if (action === "cancel-add-task") {
-      cancelAddTask(target.dataset.catId);
-      safeVibrate(10);
-      return;
-    }
-
-    if (action === "confirm-add-task") {
-      confirmAddTask(target.dataset.catId);
-      return;
-    }
-
-    if (action === "open-add-category") {
-      openAddCategory();
-      safeVibrate(10);
-      return;
-    }
-
-    if (action === "cancel-add-category") {
-      cancelAddCategory();
-      safeVibrate(10);
-      return;
-    }
-
-    if (action === "confirm-add-category") {
-      confirmAddCategory();
-      return;
-    }
-
-    if (action === "edit-task") {
-      enterEditTask(target.dataset.taskId);
-      return;
-    }
-
-    if (action === "edit-category") {
-      enterEditCategory(target.dataset.catId);
-      return;
-    }
-
-    if (action === "delete-category") {
-      deleteCategory(target.dataset.catId);
-      return;
-    }
-
-    if (action === "toggle-task") {
-      const taskId = target.dataset.taskId;
-      const card = qs(`[data-task-id="${taskId}"]`);
-      const catId = card?.dataset.catId;
-      const position = state.positions[state.activeTab];
-      const category = position?.categories.find((c) => c.id === catId);
-      const task = category?.tasks.find((t) => t.id === taskId);
-      if (!task) return;
-      task.done = !task.done;
-      scheduleSave();
-      const restock = isRestockCategory(category);
-      if (restock && isRestockFilterOn(catId)) {
-        renderActiveTab();
-        refreshProgressUI();
-      } else {
-        updateTaskDOM(taskId, catId);
-        updateSectionCounts(position.id, catId);
-        refreshProgressUI();
-      }
-      safeVibrate(12);
-      return;
-    }
-
-    if (action === "delete-task") {
-      deleteTask(target.dataset.taskId);
-      return;
-    }
-
-    if (action === "carry-add") {
-      state.carry.push({ id: createId("carry"), name: "항목", qty: "", hint: "" });
-      scheduleSave();
-      renderActiveTab();
-      safeVibrate(10);
-      return;
-    }
-
-    if (action === "carry-del") {
-      const id = target.dataset.carryId;
-      state.carry = state.carry.filter((item) => item.id !== id);
-      scheduleSave();
-      renderActiveTab();
-      safeVibrate([25, 40, 25]);
-      return;
-    }
-
+    handleActionClick(target);
   });
+
+  const restockPanel = qs("#restock-panel");
+  restockPanel?.addEventListener("pointerdown", handlePointerDown, { passive: false });
+  restockPanel?.addEventListener("pointermove", handlePointerMove, { passive: false });
+  restockPanel?.addEventListener("pointerup", handlePointerUp);
+  restockPanel?.addEventListener("pointercancel", handlePointerUp);
+  restockPanel?.addEventListener("click", (e) => {
+    const target = e.target.closest("[data-action]");
+    if (!target) return;
+    handleActionClick(target);
+  });
+
+  qs("#restock-toggle")?.addEventListener("click", () => toggleRestockPanel());
+  qs("#restock-close")?.addEventListener("click", () => toggleRestockPanel(false));
 
   content?.addEventListener("input", (e) => {
     const el = e.target;

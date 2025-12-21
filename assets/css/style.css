@@ -118,9 +118,16 @@ h1,h2,h3,h4{
   border-color:rgba(185,153,122,0.45);
   box-shadow:0 0 22px rgba(185,153,122,0.18);
   transform:scale(0.985);
+  touch-action:none;
 }
 .category-section.dragging{
   opacity:0.72;
+  touch-action:none;
+}
+.dragging-body{
+  touch-action:none;
+  overscroll-behavior:none;
+  user-select:none;
 }
 .task-card button{
   min-width:0;
@@ -344,6 +351,72 @@ button:disabled{
 }
 .icon-btn.icon-sm{
   padding:4px;
+}
+.carry-toggle svg{
+  transition:transform 0.18s ease;
+}
+.carry-toggle.open svg{
+  transform:rotate(180deg);
+}
+.carry-inline.closed{
+  display:none;
+}
+
+.restock-toggle{
+  position:fixed;
+  left:12px;
+  bottom:calc(12px + var(--safe-bottom));
+  z-index:76;
+  width:44px;
+  height:36px;
+  border-radius:10px;
+  border:1px solid rgba(185,153,122,0.45);
+  background:rgba(15,18,24,0.9);
+  color:rgba(255,255,255,0.8);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 10px 24px rgba(0,0,0,0.35);
+}
+.restock-toggle svg{
+  width:20px;
+  height:20px;
+}
+.restock-panel{
+  position:fixed;
+  left:12px;
+  top:74px;
+  z-index:79;
+  width:min(88vw,340px);
+  height:min(78vh,560px);
+  background:rgba(15,18,24,0.96);
+  border:1px solid rgba(185,153,122,0.35);
+  border-radius:calc(var(--radius) + 6px);
+  box-shadow:0 24px 60px rgba(0,0,0,0.55);
+  display:flex;
+  flex-direction:column;
+  transform:translateX(-120%);
+  transition:transform 0.24s ease;
+}
+.restock-panel.open{
+  transform:translateX(0);
+}
+.restock-panel-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 14px;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.restock-panel-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.restock-panel-body{
+  flex:1;
+  overflow-y:auto;
+  padding:12px 14px;
 }
 .tab-manager-list{
   display:flex;
@@ -747,7 +820,9 @@ button:disabled{
 .focus-mode #position-tabs,
 .focus-mode #footer-status,
 .focus-mode #chat-toggle,
-.focus-mode #chat-panel{
+.focus-mode #chat-panel,
+.focus-mode #restock-toggle,
+.focus-mode #restock-panel{
   display:none !important;
 }
 

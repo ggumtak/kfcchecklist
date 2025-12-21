@@ -112,6 +112,44 @@
 
   <button id="focus-exit" class="focus-exit">UI</button>
 
+  <button id="restock-toggle" class="restock-toggle hidden" aria-label="자재 보충">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16v10H4z" />
+      <path stroke-linecap="round" stroke-linejoin="round" d="M7 7V5h10v2" />
+      <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h8" />
+    </svg>
+  </button>
+  <div id="restock-panel" class="restock-panel">
+    <div class="restock-panel-header">
+      <div>
+        <p class="text-[9px] mono text-white/30 uppercase tracking-[0.2em]">Back Only</p>
+        <h3 class="text-sm font-black">자재 보충</h3>
+      </div>
+      <div class="restock-panel-actions">
+        <button id="restock-filter" class="restock-btn" data-action="toggle-restock-filter" data-cat-id="back-restock">필요만</button>
+        <button id="restock-reset" class="restock-btn reset icon-only" data-action="reset-restock" data-cat-id="back-restock" aria-label="reset">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 101.8-5.4" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4v5h5" />
+          </svg>
+        </button>
+        <button id="restock-close" class="icon-btn icon-sm text-white/40 hover:text-white" aria-label="close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6l-12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="restock-panel-body">
+      <div class="flex items-center justify-between text-[10px] mono text-white/30">
+        <span>진행</span>
+        <span id="restock-count">0/0</span>
+      </div>
+      <p class="restock-hint mt-2">필요할 때 체크 → 채우면 해제. 필요만 보기 가능.</p>
+      <div id="restock-list" class="grid gap-2 mt-2"></div>
+    </div>
+  </div>
+
   <div id="settings-overlay" class="modal-overlay">
     <div class="settings-panel">
       <div class="flex items-center justify-between">

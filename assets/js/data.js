@@ -94,7 +94,9 @@ export function createDefaultState(){
     ui: {
       collapsed: {},
       restockFilter: {},
-      focusMode: false
+      focusMode: false,
+      carryOpen: false,
+      restockOpen: false
     },
     preferences: {
       showCarry: true,
