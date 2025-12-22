@@ -21,6 +21,8 @@ const dragState = {
   originNextSibling: null,
   dragOffsetX: 0,
   dragOffsetY: 0,
+  prevCardTransition: "",
+  prevCardWillChange: "",
   prevBodyOverflow: "",
   prevBodyOverscroll: "",
   prevContentTouch: "",
@@ -862,6 +864,10 @@ function startDrag(card, catId, pointerId, type = "task", clientX = dragState.st
   card.style.width = `${rect.width}px`;
   card.style.zIndex = "1000";
   card.style.pointerEvents = "none";
+  dragState.prevCardTransition = card.style.transition;
+  dragState.prevCardWillChange = card.style.willChange;
+  card.style.transition = "none";
+  card.style.willChange = "top, left";
   dragState.dragOffsetX = clientX - rect.left;
   dragState.dragOffsetY = clientY - rect.top;
   document.body.classList.add("dragging-body");
@@ -967,6 +973,8 @@ function endDrag(commit = true) {
     card.style.width = "";
     card.style.zIndex = "";
     card.style.pointerEvents = "";
+    card.style.transition = dragState.prevCardTransition;
+    card.style.willChange = dragState.prevCardWillChange;
   }
   if (placeholder && placeholder.parentElement && card) {
     if (commit) {
@@ -1003,6 +1011,8 @@ function endDrag(commit = true) {
   dragState.originNextSibling = null;
   dragState.dragOffsetX = 0;
   dragState.dragOffsetY = 0;
+  dragState.prevCardTransition = "";
+  dragState.prevCardWillChange = "";
   dragState.prevBodyOverflow = "";
   dragState.prevBodyOverscroll = "";
   dragState.prevContentTouch = "";
