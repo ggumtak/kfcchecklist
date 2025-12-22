@@ -24,10 +24,14 @@ const dragState = {
   prevBodyOverflow: "",
   prevBodyOverscroll: "",
   prevContentTouch: "",
-  prevBodyTouch: ""
+  prevBodyTouch: "",
+  autoScrollTimer: null,
+  autoScrollSpeed: 0
 };
 const DRAG_LONG_PRESS_MS = 280;
 const DRAG_MOVE_THRESHOLD = 16;
+const AUTO_SCROLL_THRESHOLD = 80;
+const AUTO_SCROLL_MAX_SPEED = 15;
 
 const scheduleSave = debounce(() => saveState(state), 200);
 
@@ -872,13 +876,11 @@ function startDrag(card, catId, pointerId, type = "task", clientX = dragState.st
     dragState.prevContentTouch = container.style.touchAction;
     container.style.touchAction = "none";
   }
-  if (card.setPointerCapture) {
-    try {
-      card.setPointerCapture(pointerId);
-    } catch (_) {}
-  }
+  // Note: setPointerCapture is NOT called because card has pointerEvents='none'
+  // The window-level pointermove listener handles drag movement instead
   safeVibrate(10);
 }
+
 
 function reorderCategoryFromDOM(catId) {
   const position = state.positions[state.activeTab];
@@ -897,11 +899,66 @@ function reorderCategoriesFromDOM() {
   position.categories.sort((a, b) => order.indexOf(String(a.id)) - order.indexOf(String(b.id)));
 }
 
+function reorderTasksAcrossCategories(taskId) {
+  const position = state.positions[state.activeTab];
+  if (!position) return;
+
+  // Find which DOM list contains this task
+  const taskEl = document.querySelector(`[data-task-id="${taskId}"]`);
+  if (!taskEl) return;
+
+  const newList = taskEl.closest("[id^='list-']");
+  if (!newList) return;
+
+  const newCatId = newList.id.replace("list-", "");
+  const newCategory = position.categories.find((cat) => cat.id === newCatId);
+  if (!newCategory) return;
+
+  // Find the task in any category and remove it
+  let taskData = null;
+  for (const cat of position.categories) {
+    const idx = cat.tasks.findIndex((t) => t.id === taskId);
+    if (idx >= 0) {
+      taskData = cat.tasks.splice(idx, 1)[0];
+      break;
+    }
+  }
+
+  if (!taskData) return;
+
+  // Update task's catId in DOM
+  taskEl.dataset.catId = newCatId;
+
+  // Get new order from DOM
+  const domOrder = Array.from(newList.querySelectorAll("[data-task-id]")).map((el) => el.dataset.taskId);
+  const insertIdx = domOrder.indexOf(taskId);
+
+  // Insert task at correct position
+  if (insertIdx >= 0 && insertIdx < newCategory.tasks.length) {
+    newCategory.tasks.splice(insertIdx, 0, taskData);
+  } else {
+    newCategory.tasks.push(taskData);
+  }
+
+  // Re-sort all tasks in the new category based on DOM order
+  newCategory.tasks.sort((a, b) => domOrder.indexOf(a.id) - domOrder.indexOf(b.id));
+}
+
 function endDrag(commit = true) {
   clearDragTimer();
+
+  // Clear auto-scroll timer
+  if (dragState.autoScrollTimer) {
+    clearInterval(dragState.autoScrollTimer);
+    dragState.autoScrollTimer = null;
+  }
+  dragState.autoScrollSpeed = 0;
+
   if (!dragState.active) return;
   const card = dragState.card;
   const placeholder = dragState.placeholder;
+  const originalTaskId = card?.dataset?.taskId;
+
   if (card) {
     card.classList.remove("dragging", "drag-ghost");
     card.style.position = "";
@@ -921,11 +978,7 @@ function endDrag(commit = true) {
   } else if (!commit && dragState.originParent && card) {
     dragState.originParent.insertBefore(card, dragState.originNextSibling);
   }
-  if (dragState.card && dragState.card.releasePointerCapture) {
-    try {
-      dragState.card.releasePointerCapture(dragState.pointerId);
-    } catch (_) {}
-  }
+  // Note: releasePointerCapture not needed since we don't call setPointerCapture
   document.body.classList.remove("dragging-body");
   document.body.style.overflow = dragState.prevBodyOverflow;
   document.body.style.overscrollBehaviorY = dragState.prevBodyOverscroll;
@@ -935,8 +988,8 @@ function endDrag(commit = true) {
   if (commit) {
     if (dragState.type === "category") {
       reorderCategoriesFromDOM();
-    } else {
-      reorderCategoryFromDOM(dragState.catId);
+    } else if (originalTaskId) {
+      reorderTasksAcrossCategories(originalTaskId);
     }
     scheduleSave();
   }
@@ -956,6 +1009,7 @@ function endDrag(commit = true) {
   dragState.prevBodyTouch = "";
   dragState.suppressClickUntil = Date.now() + 300;
 }
+
 
 function handlePointerDown(e) {
   if (state.activeTab === GUIDE_TAB.id) return;
@@ -1003,18 +1057,48 @@ function handlePointerMove(e) {
 
   if (!dragState.active || dragState.pointerId !== e.pointerId) return;
 
-  e.preventDefault();
+  if (e.cancelable) e.preventDefault();
   if (dragState.card) {
     dragState.card.style.top = `${e.clientY - dragState.dragOffsetY}px`;
     dragState.card.style.left = `${e.clientX - dragState.dragOffsetX}px`;
   }
 
+  // Auto-scroll logic
+  const container = mainContent();
+  if (container) {
+    const containerRect = container.getBoundingClientRect();
+    const distanceFromTop = e.clientY - containerRect.top;
+    const distanceFromBottom = containerRect.bottom - e.clientY;
+
+    let scrollSpeed = 0;
+    if (distanceFromTop < AUTO_SCROLL_THRESHOLD && distanceFromTop > 0) {
+      scrollSpeed = -AUTO_SCROLL_MAX_SPEED * (1 - distanceFromTop / AUTO_SCROLL_THRESHOLD);
+    } else if (distanceFromBottom < AUTO_SCROLL_THRESHOLD && distanceFromBottom > 0) {
+      scrollSpeed = AUTO_SCROLL_MAX_SPEED * (1 - distanceFromBottom / AUTO_SCROLL_THRESHOLD);
+    }
+
+    dragState.autoScrollSpeed = scrollSpeed;
+    if (scrollSpeed !== 0 && !dragState.autoScrollTimer) {
+      dragState.autoScrollTimer = setInterval(() => {
+        if (!dragState.active || dragState.autoScrollSpeed === 0) {
+          clearInterval(dragState.autoScrollTimer);
+          dragState.autoScrollTimer = null;
+          return;
+        }
+        container.scrollTop += dragState.autoScrollSpeed;
+      }, 16);
+    } else if (scrollSpeed === 0 && dragState.autoScrollTimer) {
+      clearInterval(dragState.autoScrollTimer);
+      dragState.autoScrollTimer = null;
+    }
+  }
+
   if (dragState.type === "category") {
-    const container = mainContent();
     if (!container || !dragState.placeholder) return;
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const target = el?.closest(".category-section");
-    if (!target || target === dragState.placeholder) return;
+    if (!target || target === dragState.placeholder || target === dragState.card) return;
+    if (!container.contains(target)) return;
     const rect = target.getBoundingClientRect();
     const before = e.clientY < rect.top + rect.height / 2;
     if (before) {
@@ -1025,22 +1109,43 @@ function handlePointerMove(e) {
     return;
   }
 
-  const list = qs(`#list-${dragState.catId}`);
-  if (!list || !dragState.placeholder) return;
+  // Task dragging - allow cross-section movement
+  if (!dragState.placeholder) return;
 
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  const target = el?.closest(".task-card");
-  if (!target || target === dragState.placeholder) return;
-  if (target.dataset.catId !== dragState.catId) return;
 
-  const rect = target.getBoundingClientRect();
-  const before = e.clientY < rect.top + rect.height / 2;
-  if (before) {
-    list.insertBefore(dragState.placeholder, target);
-  } else {
-    list.insertBefore(dragState.placeholder, target.nextSibling);
+  // Check if hovering over a task card
+  const targetCard = el?.closest(".task-card");
+  if (targetCard && targetCard !== dragState.placeholder && targetCard !== dragState.card) {
+    const targetCatId = targetCard.dataset.catId;
+    const targetList = qs(`#list-${targetCatId}`);
+    if (targetList && targetList.contains(targetCard)) {
+      const rect = targetCard.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      if (before) {
+        targetList.insertBefore(dragState.placeholder, targetCard);
+      } else {
+        targetList.insertBefore(dragState.placeholder, targetCard.nextSibling);
+      }
+      // Update catId to new category
+      dragState.catId = targetCatId;
+      return;
+    }
+  }
+
+  // Check if hovering over a list container (empty area in a section)
+  const targetList = el?.closest("[id^='list-']");
+  if (targetList && targetList !== dragState.placeholder.parentElement) {
+    const listCatId = targetList.id.replace("list-", "");
+    // Insert at end of empty list or where mouse is
+    const children = Array.from(targetList.querySelectorAll(".task-card, .drag-placeholder"));
+    if (children.length === 0 || (children.length === 1 && children[0] === dragState.placeholder)) {
+      targetList.appendChild(dragState.placeholder);
+      dragState.catId = listCatId;
+    }
   }
 }
+
 
 function handlePointerUp(e) {
   if (dragState.longPressTimer && !dragState.active) {
@@ -1090,8 +1195,8 @@ function renderCategories(position) {
         <div class="flex items-center gap-3">
           <div class="w-1.5 h-4 bg-cyan-300"></div>
           <h3 class="text-sm font-black text-white uppercase tracking-tight" data-cat-title>${escapeHtml(
-    cat.name
-  )}</h3>
+      cat.name
+    )}</h3>
           ${isRestock ? `<span class="restock-tag">수시</span>` : ""}
         </div>
 
@@ -2227,6 +2332,8 @@ function initEventHandlers() {
     e.preventDefault();
   };
   content?.addEventListener("touchmove", preventDragScroll, { passive: false });
+  window.addEventListener("pointermove", handlePointerMove, { passive: false });
+  window.addEventListener("touchmove", preventDragScroll, { passive: false });
 
   content?.addEventListener("click", (e) => {
     const target = e.target.closest("[data-action]");
