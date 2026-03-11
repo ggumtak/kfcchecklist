@@ -1,356 +1,84 @@
-﻿<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#121212" />
-  <link rel="manifest" href="manifest.json" />
-  <title>KFC 마감 체크리스트</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="assets/css/style.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css" />
-</head>
-<body>
-  <header class="pt-6 pb-2 px-5 border-b border-white/5 flex justify-between items-end bg-black/50 backdrop-blur-lg">
-    <div>
-      <p id="system-date" class="text-[9px] mono text-cyan-300 font-bold tracking-widest uppercase mb-1">SYNCING...</p>
-      <h1 id="system-clock" class="text-3xl font-black mono tracking-tighter leading-none">00:00:00</h1>
-    </div>
-    <div class="text-right space-y-1">
-      <span id="sync-id" class="text-[8px] mono text-white/20 block">KERNEL_V6.0</span>
-      <div class="flex items-center gap-1.5 justify-end">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span class="text-[9px] mono text-emerald-500 font-bold tracking-widest">ACTIVE</span>
-      </div>
-      <div class="flex items-center gap-2 justify-end">
-        <button id="btn-focus" class="icon-btn text-white/40 hover:text-cyan-200 border border-white/10 bg-white/5" aria-label="focus mode">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7V3h4" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 7V3h-4" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 17v4h4" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 17v4h-4" />
-          </svg>
-        </button>
-        <button id="btn-settings" class="icon-btn text-white/40 hover:text-cyan-200 border border-white/10 bg-white/5" aria-label="settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1-1.7 3-0.2-.1a1.7 1.7 0 00-2 .4l-.1.1-3-1.7 0-.2a1.7 1.7 0 00-1.2-1.2l-.2-.1-3 1.7-.1-.1a1.7 1.7 0 00-2-.4l-.2.1-1.7-3 .1-.1a1.7 1.7 0 00.4-2l-.1-.2L3.3 12l.2-.2a1.7 1.7 0 000-2.4l-.2-.2 1.7-3 .2.1a1.7 1.7 0 002-.4l.1-.1 3 1.7 0 .2a1.7 1.7 0 001.2 1.2l.2.1 3-1.7.1.1a1.7 1.7 0 002 .4l.2-.1 1.7 3-.1.1a1.7 1.7 0 00-.4 2l.1.2 1.7 1-1.7 1z" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0"
+    />
+    <meta name="theme-color" content="#0b0f14" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>KFC Checklist</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" href="./icons/icon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <div class="device-shell">
+        <header class="topbar">
+          <div>
+            <p id="system-date" class="eyebrow">LOADING</p>
+            <h1 id="system-clock" class="clock">00:00:00</h1>
+          </div>
+          <div class="status-chip">
+            <span class="status-dot"></span>
+            <span id="mode-status">ACTIVE</span>
+          </div>
+        </header>
 
-  <div class="progress-bar-container"><div id="progress-fill"></div></div>
-
-  <div id="position-tabs" class="tab-bar"></div>
-
-  <main class="main-scroll px-5 py-5 space-y-6" id="main-content"></main>
-
-  <div id="footer-status" class="px-5 py-3 border-t border-white/5 bg-black/90 backdrop-blur-xl hidden">
-    <div class="flex justify-between items-center">
-      <div>
-        <span class="text-[10px] mono text-white/30 uppercase tracking-[0.2em] block mb-1">Global Completion</span>
-        <div class="flex items-end gap-2">
-          <span id="progress-percent" class="text-2xl font-black mono text-cyan-300 leading-none">00%</span>
-          <span id="task-count" class="text-[9px] mono text-white/20 mb-1">0/0 ITEMS</span>
+        <div class="global-progress" aria-hidden="true">
+          <div id="global-progress-fill" class="global-progress-fill"></div>
         </div>
-      </div>
 
-      <div class="flex items-center gap-2">
-        <button id="btn-punch-out"
-          class="text-[9px] mono text-white/35 hover:text-cyan-200 uppercase tracking-widest px-2 py-1.5 border border-white/10 rounded-[var(--radius)]">
-          퇴 근
-        </button>
+        <section id="summary-card" class="summary-card"></section>
+        <section id="role-switch" class="role-switch"></section>
 
-        <button id="btn-factory-reset"
-          class="icon-btn text-red-400/70 hover:text-red-400 border border-red-500/30"
-          aria-label="factory reset">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 101.8-5.4" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4v5h5" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  </div>
+        <section class="quick-actions">
+          <button id="toggle-edit" type="button" class="surface-button">Edit Template</button>
+          <button id="start-session" type="button" class="surface-button">New Session</button>
+          <button id="open-settings" type="button" class="surface-button">Settings</button>
+        </section>
 
-  <div id="lock-screen" class="fixed inset-0 z-50 bg-[#050608] flex flex-col items-center justify-center p-10">
-    <div class="w-full max-w-sm space-y-10">
-      <div class="space-y-3">
-        <div class="h-1.5 w-16 bg-cyan-400 mb-6"></div>
-        <h2 class="text-3xl font-black tracking-tight leading-[1.1]">
-          KFC 마감 체크리스트
-        </h2>
+        <section id="meta-row" class="meta-row"></section>
+        <section id="phase-stack" class="phase-stack"></section>
       </div>
+    </main>
 
-      <div class="grid gap-3">
-        <button id="btn-punch-back" class="btn-punch-in w-full py-6 text-lg">백 시작</button>
-        <button id="btn-punch-counter" class="btn-punch-in secondary w-full py-6 text-lg">카운터 시작</button>
-      </div>
-    </div>
-  </div>
+    <button id="floating-button" type="button" class="floating-button">Manage</button>
 
-  <div id="toast" class="px-5 py-4">
-    <div class="flex items-center justify-between gap-3">
-      <div class="min-w-0">
-        <p id="toast-msg" class="text-[12px] font-bold text-white/90 truncate">삭제됨</p>
-        <p class="text-[10px] mono text-white/35 mt-0.5">UNDO로 복구 가능 (5s)</p>
-      </div>
-      <div class="flex items-center gap-2 flex-none">
-        <button id="toast-undo"
-          class="px-4 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-cyan-200 text-[10px] mono font-bold uppercase tracking-widest">
-          UNDO
-        </button>
-        <button id="toast-close"
-          class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-white/35 text-[10px] mono">
-          X
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <button id="focus-exit" class="focus-exit">UI</button>
-
-  <button id="restock-toggle" class="restock-toggle hidden" aria-label="자재 보충">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16v10H4z" />
-      <path stroke-linecap="round" stroke-linejoin="round" d="M7 7V5h10v2" />
-      <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h8" />
-    </svg>
-  </button>
-  <div id="restock-panel" class="restock-panel">
-    <div class="restock-panel-header">
-      <div>
-        <p class="text-[9px] mono text-white/30 uppercase tracking-[0.2em]">Back Only</p>
-        <h3 class="text-sm font-black">자재 보충</h3>
-      </div>
-      <div class="restock-panel-actions">
-        <button id="restock-filter" class="restock-btn" data-action="toggle-restock-filter" data-cat-id="back-restock">필요만</button>
-        <button id="restock-reset" class="restock-btn reset icon-only" data-action="reset-restock" data-cat-id="back-restock" aria-label="reset">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 101.8-5.4" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4v5h5" />
-          </svg>
-        </button>
-        <button id="restock-close" class="icon-btn icon-sm text-white/40 hover:text-white" aria-label="close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6l-12 12" />
-          </svg>
-        </button>
-      </div>
-    </div>
-    <div class="restock-panel-body">
-      <div class="flex items-center justify-between text-[10px] mono text-white/30">
-        <span>진행</span>
-        <span id="restock-count">0/0</span>
-      </div>
-      <p class="restock-hint mt-2">필요할 때 체크 → 채우면 해제. 필요만 보기 가능.</p>
-      <div id="restock-list" class="grid gap-2 mt-2"></div>
-    </div>
-  </div>
-
-  <div id="settings-overlay" class="modal-overlay">
-    <div class="settings-panel">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Settings</p>
-          <h2 class="text-xl font-black">환경설정</h2>
+    <div id="sheet-overlay" class="sheet-overlay">
+      <section id="settings-sheet" class="settings-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div>
+            <span class="eyebrow">Shift Control</span>
+            <h3>Settings</h3>
+          </div>
+          <button id="close-settings" type="button" class="ghost-button">Close</button>
         </div>
-        <button id="settings-close" class="text-[12px] mono text-white/50">X</button>
-      </div>
 
-      <div class="settings-section space-y-3">
-        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">App</p>
-        <label class="text-[12px] text-white/70">기본 탭</label>
-        <select id="setting-default-tab" class="field w-full px-3 py-2 text-[12px]"></select>
-        <label class="flex items-center gap-2 text-[12px] text-white/70">
-          <input id="setting-show-carry" type="checkbox" /> 워크인 메모 표시
-        </label>
-        <p class="text-[11px] text-white/45">태스크는 길게 눌러 순서 변경 가능</p>
-      </div>
-
-      <div class="settings-section space-y-3">
-        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Checklists</p>
-        <label class="text-[12px] text-white/70">새 탭 추가</label>
-        <input id="setting-tab-name" class="field w-full px-3 py-2 text-[12px]" placeholder="새 체크리스트 이름" />
-        <label class="text-[11px] text-white/60">템플릿</label>
-        <select id="setting-tab-template" class="field w-full px-3 py-2 text-[12px]"></select>
-        <button id="setting-tab-add" class="w-full px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">탭 추가</button>
-        <p class="text-[11px] text-white/45">탭 관리에서 이름 변경/복제/삭제 가능</p>
-        <div class="tab-manager">
-          <p class="text-[11px] text-white/40">탭 관리</p>
-          <div id="setting-tab-list" class="tab-manager-list"></div>
+        <div class="sheet-group">
+          <button id="sheet-start-session" type="button" class="sheet-action"></button>
+          <button id="sheet-toggle-edit" type="button" class="sheet-action"></button>
+          <button id="sheet-install" type="button" class="sheet-action"></button>
+          <button id="sheet-export" type="button" class="sheet-action"></button>
+          <button id="sheet-import" type="button" class="sheet-action"></button>
         </div>
-      </div>
 
-      <div class="settings-section space-y-3">
-        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">AI Assist</p>
-        <p class="text-[11px] text-white/45">챗봇 설정의 SERVER URL/모델을 사용합니다.</p>
-        <label class="text-[11px] text-white/60">TARGET</label>
-        <select id="setting-ai-target" class="field w-full px-3 py-2 text-[12px]">
-          <option value="new">새 탭 생성</option>
-          <option value="current">현재 탭에 추가</option>
-        </select>
-        <label id="setting-ai-name-label" class="text-[11px] text-white/60">새 탭 이름</label>
-        <input id="setting-ai-name" class="field w-full px-3 py-2 text-[12px]" placeholder="예: 여행 준비" />
-        <label class="text-[11px] text-white/60">요청</label>
-        <textarea id="setting-ai-request" class="field w-full px-3 py-2 text-[12px]" rows="3" placeholder="예: 3박4일 일본 여행 준비 체크리스트 만들어줘"></textarea>
-        <button id="setting-ai-generate" class="w-full px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">AI로 초안 생성</button>
-        <p id="setting-ai-status" class="ai-status text-[11px]"></p>
-      </div>
-
-      <div class="settings-section space-y-3">
-        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">Data</p>
-        <div class="flex gap-2">
-          <button id="setting-export" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">EXPORT</button>
-          <button id="setting-import" class="flex-1 px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">IMPORT</button>
+        <div class="sheet-note">
+          <span class="eyebrow">Tip</span>
+          <p id="sheet-note-copy">Template changes apply to the next session.</p>
         </div>
-        <input id="setting-import-file" type="file" accept="application/json" class="hidden" />
-        <button id="setting-reset" class="icon-btn text-red-300 border border-red-400/30 w-full" aria-label="factory reset">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 101.8-5.4" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4v5h5" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="settings-section space-y-3">
-        <p class="text-[10px] mono text-white/30 uppercase tracking-[0.2em]">PWA</p>
-        <button id="setting-install" class="w-full px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">앱 설치 요청</button>
-        <p class="text-[11px] text-white/45">브라우저 메뉴에 “홈 화면에 추가”가 뜨는 경우도 있어요.</p>
-      </div>
-
-      <div class="settings-section">
-        <p class="text-[11px] text-white/40">체크리스트는 기기 로컬에 저장돼요. 브라우저 데이터 삭제 시 초기화됩니다.</p>
-      </div>
+      </section>
     </div>
-  </div>
 
-  <input id="inline-camera" type="file" accept="image/*" capture="environment" class="hidden" />
-  <input id="inline-gallery" type="file" accept="image/*" multiple class="hidden" />
+    <input id="import-file" type="file" accept="application/json" hidden />
 
-  <div id="camera-overlay" class="camera-overlay">
-    <div class="camera-panel">
-      <video id="camera-stream" class="camera-stream" autoplay playsinline></video>
-      <div class="camera-top">
-        <span id="camera-count" class="camera-count"></span>
-        <button id="camera-close" class="icon-btn icon-sm text-white/60" aria-label="close camera">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6l-12 12" />
-          </svg>
-        </button>
-      </div>
-      <div class="camera-controls">
-        <button id="camera-share" class="icon-btn text-white/60" aria-label="share photos" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16 6l-4-4-4 4" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 2v14" />
-          </svg>
-        </button>
-        <button id="camera-shot" class="camera-shot" aria-label="take photo"></button>
-      </div>
-    </div>
-  </div>
-
-  <button id="chat-toggle" class="chat-toggle" aria-label="chat">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M21 12c0 4.4-4.3 8-9.5 8a11 11 0 01-4.1-.8L3 20l.9-3.4A7.2 7.2 0 013 12c0-4.4 4.3-8 9.5-8S21 7.6 21 12z" />
-    </svg>
-  </button>
-  <div id="chat-panel" class="chat-panel">
-    <div class="chat-header">
-      <div>
-        <p class="text-[9px] mono text-white/30 uppercase tracking-[0.2em]">Gemini 3 Flash</p>
-        <h3 class="text-sm font-black">챗봇</h3>
-      </div>
-      <div class="chat-header-actions">
-        <button id="chat-new-inline" class="icon-btn icon-sm text-white/45 hover:text-cyan-200" aria-label="새 대화">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
-          </svg>
-        </button>
-        <button id="chat-close" class="text-[11px] mono text-white/50">X</button>
-      </div>
-    </div>
-    <div class="chat-body">
-      <div class="chat-tabs">
-        <button class="chat-tab-btn active" data-chat-tab="chat">CHAT</button>
-        <button class="chat-tab-btn" data-chat-tab="history">HISTORY</button>
-        <button class="chat-tab-btn" data-chat-tab="settings">SETTINGS</button>
-      </div>
-
-      <div class="chat-view active" data-chat-view="chat">
-        <div class="chat-toolbar">
-          <label class="chat-control">
-            <span class="chat-control-label">THINK</span>
-            <select id="chat-thinking-quick" class="chat-select">
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-            </select>
-          </label>
-          <label class="chat-control">
-            <span class="chat-control-label">PROMPT</span>
-            <select id="chat-prompt-quick" class="chat-select"></select>
-          </label>
-          <label class="chat-control">
-            <span class="chat-control-label">MODEL</span>
-            <input id="chat-model-quick" class="chat-select" type="text" placeholder="gemini-3-flash-preview" />
-          </label>
-        </div>
-        <div id="chat-messages" class="chat-messages"></div>
-        <div class="chat-input">
-          <textarea id="chat-input" class="field px-3 py-2 text-[12px]" placeholder="메시지 입력..."></textarea>
-          <button id="chat-send" class="px-4 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">SEND</button>
-        </div>
-      </div>
-
-      <div class="chat-view" data-chat-view="history">
-        <div class="chat-history">
-          <button id="chat-new" class="icon-btn text-white/45 hover:text-cyan-200" aria-label="새 대화">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" />
-            </svg>
-          </button>
-          <div id="chat-session-list" class="mt-3 space-y-2"></div>
-        </div>
-      </div>
-
-      <div class="chat-view" data-chat-view="settings">
-        <div class="chat-settings space-y-3">
-          <div class="notice">Gemini 호출은 Vercel 백엔드에서 처리됩니다. 서버 URL을 입력해 주세요.</div>
-          <label class="text-[11px] text-white/60">SERVER URL</label>
-          <input id="chat-server-url" type="url" class="field px-3 py-2 text-[12px]" placeholder="https://YOUR-VERCEL-APP.vercel.app" />
-          <button id="chat-save" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-cyan-400/10 border border-cyan-300/20 text-[11px] mono text-cyan-200">설정 저장</button>
-          <button id="chat-clear" class="px-3 py-2 rounded-[calc(var(--radius)+2px)] bg-white/5 border border-white/10 text-[11px] mono">현재 대화 초기화</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="canvas-overlay" class="canvas-overlay">
-    <div class="canvas-panel">
-      <div class="canvas-header">
-        <div>
-          <p class="text-[9px] mono text-white/30 uppercase tracking-[0.2em]">Gemini Canvas</p>
-          <h3 class="text-sm font-black">HTML 미리보기</h3>
-        </div>
-        <div class="flex items-center gap-2">
-          <button id="canvas-open" class="text-[10px] mono text-cyan-200 px-3 py-2 rounded-[calc(var(--radius)+2px)] border border-cyan-300/20">새 탭</button>
-          <button id="canvas-close" class="text-[11px] mono text-white/50">X</button>
-        </div>
-      </div>
-      <iframe id="canvas-frame" class="canvas-frame" sandbox="" referrerpolicy="no-referrer"></iframe>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
-  <script type="module" src="assets/js/main.js"></script>
-</body>
+    <script type="module" src="./app.js"></script>
+  </body>
 </html>

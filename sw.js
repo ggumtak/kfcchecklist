@@ -1,49 +1,47 @@
-const CACHE_NAME = "kfc-checklist-v26";
-const ASSETS = [
+const CACHE = "kfc-checklist-pwa-v1";
+const SHELL = [
   "./",
   "./index.html",
+  "./styles.css",
+  "./app.js",
   "./manifest.json",
-  "./assets/css/style.css",
-  "./assets/js/app.js",
-  "./assets/js/chat.js",
-  "./assets/js/data.js",
-  "./assets/js/guide.js",
-  "./assets/js/main.js",
-  "./assets/js/pwa.js",
-  "./assets/js/storage.js",
-  "./assets/js/utils.js",
-  "./assets/icons/icon-192.png",
-  "./assets/icons/icon-512.png",
-  "./prompts/searchmode_251124.txt",
-  "./prompts/ailey-debate-v1213.txt",
-  "./prompts/ailey-bailey-x-251023.txt"
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+      Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  if (event.request.method !== "GET") {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      if (cached) return cached;
+      if (cached) {
+        return cached;
+      }
+
       return fetch(event.request)
         .then((response) => {
+          if (!response || response.status !== 200 || response.type !== "basic") {
+            return response;
+          }
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
           return response;
         })
         .catch(() => cached);
