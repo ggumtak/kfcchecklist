@@ -1,4 +1,8 @@
-.vercel
+.next
 node_modules
-.env
-.env.*
+coverage
+dist
+*.log
+*.tsbuildinfo
+pnpm-lock.yaml
+yarn.lock
